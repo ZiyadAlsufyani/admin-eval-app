@@ -14,7 +14,8 @@ export default defineConfig({
         name: 'تقييم الإداريين',
         short_name: 'تقييم',
         description: 'تطبيق داخلي لتقييم الأداء',
-        theme_color: '#ffffff',
+        theme_color: '#f9f9f9',
+        background_color: '#ffffff',
         display: 'standalone',
         icons: [
           {
@@ -26,6 +27,9 @@ export default defineConfig({
       }
     })
   ],
+  preview: {
+    allowedHosts: true, // This allows any external URL (like LocalTunnel) to access the preview
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

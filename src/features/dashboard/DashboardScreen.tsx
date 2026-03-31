@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLivePerformance } from './useLivePerformance';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { Icon } from '@/components/ui/icon';

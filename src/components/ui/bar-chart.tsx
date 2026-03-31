@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -68,7 +67,7 @@ export function BarChart({ data, barColor = 'hsl(var(--primary))', height = 240 
             animationDuration={800}
             animationEasing="ease-out"
           >
-            {data.map((entry, index) => (
+            {data.map((_entry, index) => (
               <Cell key={`cell-${index}`} fill={barColor} />
             ))}
           </Bar>

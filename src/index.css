@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@layer base {
+  html, body {
+    /* Prevent Android Chrome pull-to-refresh gray line artifacts */
+    overscroll-behavior-y: none;
+    /* Explicitly lock body background to surface color to prevent bleed */
+    background-color: #f9f9f9;
+  }
+}
+
 @theme {
   --font-sans: "Cairo", system-ui, sans-serif;
 
@@ -91,8 +100,16 @@
     --vertex-teal: 172 57% 43%; /* #2fab99 */
     --warning-soft: 38 92.2% 50.2%; /* #f59e0b */
     --warning-bg: 48 100% 96.1%; /* #fffbeb */
-    
-    --radius: 0.75rem; 
+  --radius: 0.75rem; 
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
   }
 }
 

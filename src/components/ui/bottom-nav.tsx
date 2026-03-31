@@ -1,4 +1,3 @@
-import React from 'react';
 import { cn } from '@/lib/utils';
 import { Icon, type IconName } from './icon';
 
@@ -18,8 +17,12 @@ interface BottomNavProps {
 
 export function BottomNav({ items, activeId, onNavigate }: BottomNavProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe">
-      <div className="bg-surface-container-lowest/80 backdrop-blur-xl border-t border-outline-variant/15 flex items-center justify-around px-2 py-3">
+    <nav className="fixed bottom-0 left-0 right-0 z-50">
+      {/* 
+        For iOS/Android edge-to-edge support: 
+        pb-safe pushes the inner content up, dodging the gesture bar 
+      */}
+      <div className="bg-surface-container-lowest/80 backdrop-blur-xl border-t border-outline-variant/15 flex items-center justify-around px-2 py-3 pb-safe">
         {items.map((item) => {
           const isActive = item.id === activeId;
           
@@ -56,6 +59,6 @@ export function BottomNav({ items, activeId, onNavigate }: BottomNavProps) {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
