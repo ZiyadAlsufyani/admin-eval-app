@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#f9f9f9",
+                        "primary": "#006b5e",
+                        "vertex-teal": "#2fab99",
+                        "warning-soft": "#f59e0b",
+                        "warning-bg": "#fffbeb",
+                        "secondary": "#4a635e",
+                        "on-surface": "#1b1b1b",
+                        "surface-container": "#eeeeee",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-container-lowest": "#ffffff",
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem",
+                        "lg": "0.75rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-24">
+<header class="w-full top-0 sticky bg-surface flex flex-row-reverse justify-between items-center px-6 py-4 h-16 z-50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container border-2 border-vertex-teal">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiGuKUYyf_EEwt-4NIdfzIac6h49bB2NgG61ORRPCFPl4buQPgkP5rDBir-94lJgWTylG49D_UTM7OdMx0SpJ77R5bjpJVh9YF5bJX6Y5TQSHH2K0yH6OKs6NeqqAvBy_IuoZzEto1NBSHGSmZA5keQLjGVar166Za9TlBfO9eUhoT3Y3I1GBUjd1DlmZi_EUZ5EWtppQPtVHLW98_vIcXML1W2dXqMn1Q1R5oHdHdeLv3lzLK8D04mhAg4xVSR8wVAO8VJsWP1hy1"/>
+</div>
+<span class="material-symbols-outlined text-vertex-teal p-2 hover:bg-vertex-teal/10 rounded-full transition-transform active:scale-95 duration-200">notifications</span>
+</div>
+<div class="flex flex-col items-end">
+<h1 class="text-xl font-extrabold text-vertex-teal">فيرتكس إنسايت</h1>
+</div>
+</header>
+<main class="px-5 pt-2 space-y-6">
+<section class="space-y-3">
+<div class="flex justify-between items-center">
+<h2 class="text-sm font-extrabold text-on-surface">إجراءات عاجلة</h2>
+</div>
+<div class="bg-vertex-teal text-white p-6 rounded-xl shadow-lg flex justify-between items-center relative overflow-hidden">
+<div class="z-10">
+<span class="text-xs font-medium opacity-90 block mb-1">التقييمات المعلقة</span>
+<span class="text-4xl font-black block">12</span>
+<button class="mt-4 bg-white text-vertex-teal px-4 py-2 rounded-lg text-xs font-extrabold shadow-md active:scale-95 transition-transform">
+                        ابدأ التقييم الآن
+                    </button>
+</div>
+<span class="material-symbols-outlined text-white/20 text-8xl absolute -left-4 -bottom-4">pending_actions</span>
+</div>
+</section>
+<section class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-3 shadow-sm border border-surface-container">
+<span class="material-symbols-outlined text-primary text-2xl">analytics</span>
+<div class="flex flex-col">
+<span class="text-[10px] font-semibold text-secondary leading-tight">الأداء العام</span>
+<span class="text-lg font-bold text-primary">88%</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-3 shadow-sm border border-surface-container">
+<span class="material-symbols-outlined text-on-surface text-2xl">grade</span>
+<div class="flex flex-col">
+<span class="text-[10px] font-semibold text-secondary leading-tight">متوسط التقييم</span>
+<span class="text-lg font-bold text-on-surface">4.8</span>
+</div>
+</div>
+</section>
+<section class="space-y-4">
+<div class="flex justify-between items-center">
+<h2 class="text-sm font-extrabold text-on-surface">أداء يحتاج إلى متابعة</h2>
+<span class="text-[10px] font-bold text-vertex-teal cursor-pointer">عرض سجل الأداء</span>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl shadow-sm border border-surface-container">
+<div class="space-y-5">
+<div class="flex items-center gap-3">
+<span class="text-[11px] font-bold text-on-surface w-12 text-right">سارة</span>
+<div class="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 92%;"></div>
+</div>
+<span class="text-[11px] font-bold text-secondary w-8 text-left">92%</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[11px] font-bold text-on-surface w-12 text-right">نورا</span>
+<div class="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-vertex-teal rounded-full" style="width: 88%;"></div>
+</div>
+<span class="text-[11px] font-bold text-secondary w-8 text-left">88%</span>
+</div>
+<div class="flex items-center gap-3 p-2 -mx-2 bg-warning-bg rounded-lg">
+<span class="text-[11px] font-black text-on-surface w-12 text-right">ياسين</span>
+<div class="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-warning-soft rounded-full" style="width: 70%;"></div>
+</div>
+<div class="flex items-center gap-1 w-12 justify-end">
+<span class="text-[11px] font-black text-warning-soft">70%</span>
+<span class="material-symbols-outlined text-warning-soft text-sm">priority_high</span>
+</div>
+</div>
+<div class="flex items-center gap-3 p-2 -mx-2 bg-warning-bg rounded-lg">
+<span class="text-[11px] font-black text-on-surface w-12 text-right">خالد</span>
+<div class="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-warning-soft rounded-full" style="width: 65%;"></div>
+</div>
+<div class="flex items-center gap-1 w-12 justify-end">
+<span class="text-[11px] font-black text-warning-soft">65%</span>
+<span class="material-symbols-outlined text-warning-soft text-sm">priority_high</span>
+</div>
+</div>
+<div class="flex items-center gap-3 p-2 -mx-2 bg-orange-50 rounded-lg">
+<span class="text-[11px] font-black text-on-surface w-12 text-right">عمر</span>
+<div class="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-orange-500 rounded-full" style="width: 55%;"></div>
+</div>
+<div class="flex items-center gap-1 w-12 justify-end">
+<span class="text-[11px] font-black text-orange-600">55%</span>
+<span class="material-symbols-outlined text-orange-600 text-sm">warning</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<nav class="fixed bottom-0 left-0 w-full z-50 flex flex-row-reverse justify-around items-center px-4 pb-safe h-20 bg-surface rounded-t-xl shadow-[0_-4px_12px_rgba(11,28,48,0.06)] border-t-[0.5px] border-[#c5c5d7]/20">
+<a class="flex flex-col items-center justify-center text-secondary px-4 py-1.5 transition-opacity active:opacity-80 group" href="#">
+<span class="material-symbols-outlined text-secondary group-hover:text-vertex-teal">pending_actions</span>
+<span class="text-[10px] font-bold text-right mt-1">التقييمات المعلقة</span>
+</a>
+<a class="flex flex-col items-center justify-center text-vertex-teal px-4 py-1.5 transition-opacity active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="text-[10px] font-black text-right mt-1">الصفحة الرئيسية</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary px-4 py-1.5 transition-opacity active:opacity-80 group" href="#">
+<span class="material-symbols-outlined group-hover:text-vertex-teal">bar_chart</span>
+<span class="text-[10px] font-bold text-right mt-1">التقارير</span>
+</a>
+</nav>
+
+</body></html>
