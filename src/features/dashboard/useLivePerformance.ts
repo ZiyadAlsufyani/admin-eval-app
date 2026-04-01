@@ -118,5 +118,11 @@ export function useLivePerformance() {
     return () => clearInterval(intervalId);
   }, []);
 
-  return { staffList };
+  const updateStaffStatus = (id: string, updates: Partial<StaffMember>) => {
+    setStaffList((current) =>
+      current.map((staff) => (staff.id === id ? { ...staff, ...updates } : staff))
+    );
+  };
+
+  return { staffList, updateStaffStatus };
 }

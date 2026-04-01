@@ -1,8 +1,10 @@
-import { useLivePerformance } from '@/features/dashboard/useLivePerformance';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
+import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 
 export default function PendingEvaluationsScreen() {
-  const { staffList } = useLivePerformance();
+  const { staffList } = useOutletContext<StaffOutletContext>();
+  const navigate = useNavigate();
 
   // Stats calculation
   const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'متأخر').length;
@@ -118,12 +120,16 @@ export default function PendingEvaluationsScreen() {
                       <span className="text-[10px] text-secondary/70 uppercase tracking-wider font-semibold">تاريخ الاستحقاق</span>
                       <span className="text-[13px] font-bold text-foreground">{staff.dueDate}</span>
                     </div>
-                    {isToday ? (
-                      <button className="bg-surface-container hover:bg-surface-container-high text-foreground px-5 py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all">
+                    {staff.isDraft ? (
+                      <button 
+                        onClick={() => navigate(`/evaluate/${staff.id}`)}
+                        className="bg-surface-container hover:bg-surface-container-high text-foreground px-5 py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all">
                         إكمال النموذج
                       </button>
                     ) : (
-                      <button className="bg-vertex-teal hover:bg-vertex-teal/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-vertex-teal/20 active:scale-95 transition-all">
+                      <button 
+                        onClick={() => navigate(`/evaluate/${staff.id}`)}
+                        className="bg-vertex-teal hover:bg-vertex-teal/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-vertex-teal/20 active:scale-95 transition-all">
                         بدء التقييم
                       </button>
                     )}

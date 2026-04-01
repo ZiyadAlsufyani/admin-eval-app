@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router-dom';
-import { useLivePerformance } from './useLivePerformance';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
+import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 
 export default function DashboardScreen() {
-  const { staffList } = useLivePerformance();
+  const { staffList } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
 
   // Derived Statistics from arbitrary number of staff

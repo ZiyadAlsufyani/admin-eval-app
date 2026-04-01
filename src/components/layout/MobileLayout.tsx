@@ -1,9 +1,18 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/ui/bottom-nav';
+import { useLivePerformance } from '@/features/dashboard/useLivePerformance';
+import type { StaffMember } from '@/types/staff';
+
+export type StaffOutletContext = {
+  staffList: StaffMember[];
+  updateStaffStatus: (id: string, updates: Partial<StaffMember>) => void;
+};
 
 export function MobileLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  // Lift global live state to the shared persistent router frame
+  const { staffList, updateStaffStatus } = useLivePerformance();
 
   // Map route paths to valid BottomNav activeIds
   const currentPath = location.pathname;
@@ -20,7 +29,7 @@ export function MobileLayout() {
 
   return (
     <div className="min-h-screen bg-surface w-full max-w-md mx-auto relative shadow-2xl">
-      <Outlet />
+      <Outlet context={{ staffList, updateStaffStatus }} />
       <BottomNav
         activeId={activeTab}
         onNavigate={handleNavigation}
