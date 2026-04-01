@@ -4,7 +4,7 @@ import type { StaffMember } from '@/types/staff';
 const INITIAL_STAFF: StaffMember[] = [
   {
     id: 's1',
-    name: 'سارة جنكينز', // Sarah Jenkins
+    name: 'لطيفة الثبيتي',
     role: 'معلمة',
     subject: 'الرياضيات',
     dueDate: '12 أكتوبر 2023',
@@ -17,12 +17,12 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's2',
-    name: 'ماركوس هولواي', // Marcus Holloway
+    name: 'سلطانه الزهراني',
     role: 'معلم',
     subject: 'التربية البدنية',
     dueDate: 'اليوم، 04:00 م',
     status: 'اليوم',
-    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDenc-qcfzBbjSmZ9c6vhauLT5P92RAam4i0ITbPx5cEWv4JDe17lpODLwtD60HQtEs8of1-ehw5LRrRVmph4Fb8P-HGU5Nl9uhcBmjS2R3GDXagQSAh12PVr4szCyV1DURTtrzcF2CeI1Y8ielMTLvAYGsY_uvlAJr_VSncLnU55N_vJnOLZuPvrwRQSStt47Nga7Q1P5JwWO4VywRR08kP4Z4gqSlTdkKYBs1RcbEIWDwnGzQsMVWlXcr2y6--RcBshGs16qnJrKH',
+    avatarUrl: 'https://i.ibb.co/wNjpZn7Z/Gemini-Generated-Image-u2o70cu2o70cu2o7-3.png',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 85 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 82 },
@@ -30,7 +30,7 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's3',
-    name: 'لينا أحمد', // Lina Ahmed
+    name: 'نوره مبارك',
     role: 'معلمة',
     subject: 'العلوم العامة',
     dueDate: '15 أكتوبر 2023',
@@ -43,11 +43,12 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's4',
-    name: 'أحمد محمود',
+    name: 'نوره الجميعي',
     role: 'وكيل شؤون الطلاب',
     subject: 'الإدارة',
     dueDate: '20 أكتوبر 2023',
     status: 'معلق',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCAVwUszqaVscpol3xzVxrbQ1E4GUnQfMQqOUJPo0CCHwJUysqCZFIBPJiVNZJ2gowjsqpru5thVzbaypOf4P0uxWh2i7bTc7pPNx_crHKCNhBk-Tj6I3zLS7x3IscgbHFAyMlIgLwYITB4wDlZ9dWaMbjOdzDogCiWtcJi7WqFW6eJW6WjWM0QoDNX0HSmD5B0FmmBeAprgQAe4anezovWiX6Jtc08IX1UGxOtclqThsQyUFjeMrl84YrItYA33RMSAJQvuZ_Y4BKL',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 85 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 80 },
@@ -55,11 +56,12 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's5',
-    name: 'ياسر علي',
+    name: 'نوال سحاري',
     role: 'محاسب المدرسة',
     subject: 'المالية',
     dueDate: '22 أكتوبر 2023',
     status: 'معلق',
+    avatarUrl: 'https://i.ibb.co/r27yRgPJ/Gemini-Generated-Image-u2o70cu2o70cu2o7-2.png',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 95 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 92 },
@@ -67,7 +69,29 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's6',
-    name: 'نورة إبراهيم',
+    name: 'ليلى ال محبوب',
+    role: 'مراقبة أدوار',
+    subject: 'الإشراف',
+    dueDate: 'أمس، 02:00 م',
+    status: 'متأخر',
+    metrics: {
+      discipline: { id: 'discipline', name: 'الانضباط', score: 82 },
+      competencies: { id: 'competencies', name: 'الجدارات', score: 79 },
+    },
+  }, {
+    id: 's7',
+    name: 'سميره',
+    role: 'مراقبة أدوار',
+    subject: 'الإشراف',
+    dueDate: 'أمس، 02:00 م',
+    status: 'متأخر',
+    metrics: {
+      discipline: { id: 'discipline', name: 'الانضباط', score: 82 },
+      competencies: { id: 'competencies', name: 'الجدارات', score: 79 },
+    },
+  },{
+    id: 's8',
+    name: 'موضي البقمي',
     role: 'مراقبة أدوار',
     subject: 'الإشراف',
     dueDate: 'أمس، 02:00 م',
@@ -93,13 +117,13 @@ export function useLivePerformance() {
 
           // Copy current metrics
           const newMetrics = { ...staff.metrics };
-          
+
           Object.keys(newMetrics).forEach((metricKey) => {
             // Random fluctuation between -3 and +3
             const fluctuation = Math.floor(Math.random() * 7) - 3;
             let currentScore = newMetrics[metricKey].score;
             let newScore = currentScore + fluctuation;
-            
+
             // Keep scores bound between 0 and 100
             if (newScore > 100) newScore = 100;
             if (newScore < 0) newScore = 0;
