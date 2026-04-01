@@ -8,7 +8,10 @@ export type StaffMember = {
   id: string;
   name: string;
   role: string;
-  avatarUrl?: string; // Optional future support for profile images
+  avatarUrl?: string;
+  subject?: string; // Evaluated subject (e.g. الرياضيات)
+  dueDate?: string; // Date string for evaluations
+  status?: 'اليوم' | 'متأخر' | 'معلق'; // Task deadline state
   metrics: Record<string, EvaluationMetric>; // Map of metric ID to the actual score object
 };
 

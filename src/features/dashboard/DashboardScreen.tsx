@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLivePerformance } from './useLivePerformance';
-import { BottomNav } from '@/components/ui/bottom-nav';
 import { Icon } from '@/components/ui/icon';
 
 export default function DashboardScreen() {
   const { staffList } = useLivePerformance();
-  const [activeTab, setActiveTab] = useState('home');
+  const navigate = useNavigate();
 
   // Derived Statistics from arbitrary number of staff
   const staffCount = staffList.length;
@@ -29,7 +28,7 @@ export default function DashboardScreen() {
             <img 
               alt="User Avatar" 
               className="w-full h-full object-cover" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiGuKUYyf_EEwt-4NIdfzIac6h49bB2NgG61ORRPCFPl4buQPgkP5rDBir-94lJgWTylG49D_UTM7OdMx0SpJ77R5bjpJVh9YF5bJX6Y5TQSHH2K0yH6OKs6NeqqAvBy_IuoZzEto1NBSHGSmZA5keQLjGVar166Za9TlBfO9eUhoT3Y3I1GBUjd1DlmZi_EUZ5EWtppQPtVHLW98_vIcXML1W2dXqMn1Q1R5oHdHdeLv3lzLK8D04mhAg4xVSR8wVAO8VJsWP1hy1" 
+              src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png" 
             />
           </div>
           <button aria-label="الإشعارات" className="text-vertex-teal p-2 hover:bg-vertex-teal/10 rounded-full transition-transform active:scale-95 duration-200">
@@ -37,7 +36,7 @@ export default function DashboardScreen() {
           </button>
         </div>
         <div className="flex flex-col items-end">
-          <h1 className="text-xl font-extrabold text-vertex-teal tracking-tight">فيرتكس إنسايت</h1>
+          <h1 className="text-xl font-extrabold text-vertex-teal tracking-tight">سعدى الشهري</h1>
         </div>
       </header>
 
@@ -52,7 +51,10 @@ export default function DashboardScreen() {
             <div className="z-10">
               <span className="text-xs font-medium opacity-90 block mb-1">التقييمات المعلقة</span>
               <span className="text-4xl font-black block">{pendingCount}</span>
-              <button className="mt-4 bg-white text-vertex-teal px-4 py-2 rounded-lg text-xs font-extrabold shadow-md active:scale-95 transition-transform">
+              <button 
+                onClick={() => navigate('/tasks')}
+                className="mt-4 bg-white text-vertex-teal px-4 py-2 rounded-lg text-xs font-extrabold shadow-md active:scale-95 transition-transform"
+              >
                 ابدأ التقييم الآن
               </button>
             </div>
@@ -134,17 +136,6 @@ export default function DashboardScreen() {
         </section>
 
       </main>
-
-      {/* Glassy Bottom Navigation */}
-      <BottomNav
-        activeId={activeTab}
-        onNavigate={(id) => setActiveTab(id)}
-        items={[
-          { id: 'tasks', label: 'المهام', icon: 'CheckSquare', href: '#' },
-          { id: 'home', label: 'الرئيسية', icon: 'Home', href: '#' },
-          { id: 'reports', label: 'التقارير', icon: 'FileText', href: '#' },
-        ]}
-      />
     </div>
   );
 }

@@ -4,8 +4,12 @@ import type { StaffMember } from '@/types/staff';
 const INITIAL_STAFF: StaffMember[] = [
   {
     id: 's1',
-    name: 'أحمد محمود',
-    role: 'وكيل شؤون الطلاب',
+    name: 'سارة جنكينز', // Sarah Jenkins
+    role: 'معلمة',
+    subject: 'الرياضيات',
+    dueDate: '12 أكتوبر 2023',
+    status: 'متأخر',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA7oms4e7B36QGf2yzdtVANXgdN6GGP9HO5d0t1HAnVzOHAXbB_QRR0m6z0NyR_pp4r3R5gHm_waIID2ygfp6yPbWNmh1aBVd7LZc7m1ZCDOtHBO6OFKdqECT7Eke2ZeXcsK7F8b0mAQtQb8diau3xItmTwmy3ywL2d5OwfNIrAR6iXuU_IeTwcLTtj6vmX5NXoY2WF53CUhLgWl9-oMHmxoFfm2mtaCiS3sW6dRYhlzLdauCTRjmkB85rhXkRBzRNqd7ZYEDhl5B8Q',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 92 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 88 },
@@ -13,17 +17,25 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's2',
-    name: 'محمد عبدالله',
-    role: 'مشرف إداري',
+    name: 'ماركوس هولواي', // Marcus Holloway
+    role: 'معلم',
+    subject: 'التربية البدنية',
+    dueDate: 'اليوم، 04:00 م',
+    status: 'اليوم',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDenc-qcfzBbjSmZ9c6vhauLT5P92RAam4i0ITbPx5cEWv4JDe17lpODLwtD60HQtEs8of1-ehw5LRrRVmph4Fb8P-HGU5Nl9uhcBmjS2R3GDXagQSAh12PVr4szCyV1DURTtrzcF2CeI1Y8ielMTLvAYGsY_uvlAJr_VSncLnU55N_vJnOLZuPvrwRQSStt47Nga7Q1P5JwWO4VywRR08kP4Z4gqSlTdkKYBs1RcbEIWDwnGzQsMVWlXcr2y6--RcBshGs16qnJrKH',
     metrics: {
-      discipline: { id: 'discipline', name: 'الانضباط', score: 75 },
+      discipline: { id: 'discipline', name: 'الانضباط', score: 85 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 82 },
     },
   },
   {
     id: 's3',
-    name: 'سارة خالد',
-    role: 'مرشدة طلابية',
+    name: 'لينا أحمد', // Lina Ahmed
+    role: 'معلمة',
+    subject: 'العلوم العامة',
+    dueDate: '15 أكتوبر 2023',
+    status: 'معلق',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCAVwUszqaVscpol3xzVxrbQ1E4GUnQfMQqOUJPo0CCHwJUysqCZFIBPJiVNZJ2gowjsqpru5thVzbaypOf4P0uxWh2i7bTc7pPNx_crHKCNhBk-Tj6I3zLS7x3IscgbHFAyMlIgLwYITB4wDlZ9dWaMbjOdzDogCiWtcJi7WqFW6eJW6WjWM0QoDNX0HSmD5B0FmmBeAprgQAe4anezovWiX6Jtc08IX1UGxOtclqThsQyUFjeMrl84YrItYA33RMSAJQvuZ_Y4BKL',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 98 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 95 },
@@ -31,8 +43,11 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's4',
-    name: 'عمر فهد',
-    role: 'مسؤول القبول والتسجيل',
+    name: 'أحمد محمود',
+    role: 'وكيل شؤون الطلاب',
+    subject: 'الإدارة',
+    dueDate: '20 أكتوبر 2023',
+    status: 'معلق',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 85 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 80 },
@@ -40,38 +55,26 @@ const INITIAL_STAFF: StaffMember[] = [
   },
   {
     id: 's5',
-    name: 'منى عبدالرحمن',
-    role: 'أمينة مكتبة',
-    metrics: {
-      discipline: { id: 'discipline', name: 'الانضباط', score: 90 },
-      competencies: { id: 'competencies', name: 'الجدارات', score: 89 },
-    },
-  },
-  {
-    id: 's6',
     name: 'ياسر علي',
     role: 'محاسب المدرسة',
+    subject: 'المالية',
+    dueDate: '22 أكتوبر 2023',
+    status: 'معلق',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 95 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 92 },
     },
   },
   {
-    id: 's7',
+    id: 's6',
     name: 'نورة إبراهيم',
     role: 'مراقبة أدوار',
+    subject: 'الإشراف',
+    dueDate: 'أمس، 02:00 م',
+    status: 'متأخر',
     metrics: {
       discipline: { id: 'discipline', name: 'الانضباط', score: 82 },
       competencies: { id: 'competencies', name: 'الجدارات', score: 79 },
-    },
-  },
-  {
-    id: 's8',
-    name: 'خالد عبدالعزيز',
-    role: 'أمين مستودع',
-    metrics: {
-      discipline: { id: 'discipline', name: 'الانضباط', score: 88 },
-      competencies: { id: 'competencies', name: 'الجدارات', score: 84 },
     },
   },
 ];
