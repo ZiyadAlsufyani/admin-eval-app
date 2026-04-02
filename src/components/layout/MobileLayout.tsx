@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/ui/bottom-nav';
-import { useLivePerformance } from '@/features/dashboard/useLivePerformance';
+import { useStaffQuery } from '@/api/staff';
+import { useQueryClient } from '@tanstack/react-query';
 import type { StaffMember } from '@/types/staff';
 
 export type StaffOutletContext = {
@@ -11,8 +12,19 @@ export type StaffOutletContext = {
 export function MobileLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  // Lift global live state to the shared persistent router frame
-  const { staffList, updateStaffStatus } = useLivePerformance();
+  const queryClient = useQueryClient();
+  
+  // Fetch real data via TanStack + Supabase
+  const { data: staffList = [], isLoading } = useStaffQuery();
+
+  // Create a bridging function that updates the TanStack cache directly 
+  // (acting exactly like our old mock hook but for real data caching)
+  const updateStaffStatus = (id: string, updates: Partial<StaffMember>) => {
+    queryClient.setQueryData<StaffMember[]>(['staff'], (old) => {
+      if (!old) return [];
+      return old.map(staff => staff.id === id ? { ...staff, ...updates } : staff);
+    });
+  };
 
   // Map route paths to valid BottomNav activeIds
   const currentPath = location.pathname;
@@ -21,11 +33,18 @@ export function MobileLayout() {
   if (currentPath === '/reports') activeTab = 'reports';
 
   const handleNavigation = (id: string) => {
-    // Determine target route based on ID
     if (id === 'home') navigate('/');
     if (id === 'tasks') navigate('/tasks');
     if (id === 'reports') navigate('/reports');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center font-bold text-foreground">
+        جاري تحميل البيانات...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface w-full max-w-md mx-auto relative shadow-2xl">
@@ -34,9 +53,9 @@ export function MobileLayout() {
         activeId={activeTab}
         onNavigate={handleNavigation}
         items={[
+          { id: 'reports', label: 'التقارير', icon: 'FileText', href: '/reports' },
           { id: 'tasks', label: 'المهام', icon: 'CheckSquare', href: '/tasks' },
           { id: 'home', label: 'الرئيسية', icon: 'Home', href: '/' },
-          { id: 'reports', label: 'التقارير', icon: 'FileText', href: '/reports' },
         ]}
       />
     </div>
