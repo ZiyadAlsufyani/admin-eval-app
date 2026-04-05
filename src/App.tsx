@@ -3,15 +3,28 @@ import DashboardScreen from './features/dashboard/DashboardScreen';
 import { MobileLayout } from './components/layout/MobileLayout';
 import PendingEvaluationsScreen from './features/evaluations/PendingEvaluationsScreen';
 import EvaluationFormScreen from './features/evaluations/EvaluationFormScreen';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { LoginScreen } from './features/auth/LoginScreen';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<MobileLayout />}>
-          <Route path="/" element={<DashboardScreen />} />
-          <Route path="/tasks" element={<PendingEvaluationsScreen />} />
-          <Route path="/evaluate/:staffId" element={<EvaluationFormScreen />} />
+        {/* Public Routes */}
+        <Route path="/login" element={<LoginScreen />} />
+        
+        {/* Protected SaaS Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={null} /> {/* Handled by ProtectedRoute redirection */}
+          
+          <Route element={<MobileLayout />}>
+            <Route path="/admin-dashboard" element={<DashboardScreen />} />
+            <Route path="/staff-dashboard" element={<div className="p-8 text-center text-primary font-bold">لوحة تحكم المعلم (قيد التطوير)</div>} />
+            <Route path="/tasks" element={<PendingEvaluationsScreen />} />
+            <Route path="/evaluate/:staffId" element={<EvaluationFormScreen />} />
+          </Route>
+          
+          <Route path="/waiting-room" element={<div className="min-h-screen bg-surface flex flex-col justify-center items-center text-center p-8"><h1 className="text-2xl font-bold text-primary mb-4">في انتظار موافقة الإدارة</h1><p className="text-on-surface-variant font-light">مدرستك حالياً قيد المراجعة والتدقيق. سيتم تفعيل حسابك بمجرد الانتهاء.</p></div>} />
         </Route>
       </Routes>
     </BrowserRouter>
