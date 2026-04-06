@@ -126,11 +126,12 @@ export function LoginScreen() {
             </div>
           </form>
 
-          <div className="mt-12 flex flex-col items-center gap-4">
-            <p className="text-sm text-on-surface-variant">
+          {/* Call to action at screen bottom */}
+          <div className="mt-auto pt-10 pb-6 text-center">
+            <p className="text-sm font-medium text-secondary tracking-wide">
               ليس لديك حساب؟{' '}
-              <Link to="/signup" className="text-primary font-bold hover:text-teal-700 transition-colors mr-1">
-                إنشاء حساب مدرسة
+              <Link to="/signup" className="text-primary font-bold mr-1 hover:underline active:opacity-70 transition-all">
+                سجل هنا
               </Link>
             </p>
           </div>

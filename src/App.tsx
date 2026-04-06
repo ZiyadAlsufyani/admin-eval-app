@@ -5,6 +5,8 @@ import PendingEvaluationsScreen from './features/evaluations/PendingEvaluationsS
 import EvaluationFormScreen from './features/evaluations/EvaluationFormScreen';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginScreen } from './features/auth/LoginScreen';
+import SignUpScreen from './features/auth/SignUpScreen';
+import StaffSignUpScreen from './features/auth/StaffSignUpScreen';
 import StaffManagementScreen from './features/staff/StaffManagementScreen';
 import StaffProfileScreen from './features/staff/StaffProfileScreen';
 
@@ -14,6 +16,8 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginScreen />} />
+        <Route path="/signup" element={<SignUpScreen />} />
+        <Route path="/signup/staff" element={<StaffSignUpScreen />} />
         
         {/* Protected SaaS Routes */}
         <Route element={<ProtectedRoute />}>
