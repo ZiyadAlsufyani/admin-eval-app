@@ -28,46 +28,30 @@ export default function StaffSignUpScreen() {
     setErrorMsg('');
 
     try {
-      // Step 1: Create the Auth Engine Identity
+      // Step 1: Fire the Atomic Trigger Payload
       const { data: userAuth, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: 'staff'
+          }
+        }
       });
 
       if (authError) throw authError;
-      if (!userAuth.user) throw new Error('فشل إنشاء الحساب. قد يكون هذا البريد مسجلاً مسبقاً.');
 
-      // Step 2: Validate Invitation & Secure School Mapping
-      // The backend RLS policy guarantees we can only read rows matching our newly authenticated email
-      const { data: inviteList, error: inviteError } = await supabase
-        .from('staff_invitations')
-        .select('school_id')
-        .eq('email', email);
-
-      if (inviteError || !inviteList || inviteList.length === 0) {
-        // Fallback cleanup: If they weren't invited, their auth.users account exists but they have no profile.
-        // Usually handled gracefully via Edge Functions later, but effectively they are isolated.
-        throw new Error('لم يتم العثور على دعوة صالحة لهذا البريد الإلكتروني. لا يمكنك الانضمام للمدرسة دون دعوة من الإدارة.');
+      // Check if Email Confirmation is enforcing a lock
+      if (!userAuth.session) {
+        setFullName('');
+        setEmail('');
+        setPassword('');
+        setErrorMsg('تم قبول الدعوة! يرجى مراجعة بريدك الإلكتروني لتفعيل حسابك قبل تسجيل الدخول.');
+        return; 
       }
 
-      const verifiedSchoolId = inviteList[0].school_id;
-
-      // Step 3: Bind the Secure Profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userAuth.user.id,
-          full_name: fullName,
-          role: 'staff',
-          school_id: verifiedSchoolId,
-        });
-
-      if (profileError) throw profileError;
-
-      // Optional Cleanup Step: Remove consumed invitation to cleanly free up database clutter
-      await supabase.from('staff_invitations').delete().eq('email', email);
-
-      // Successfully onboarded. Route home!
+      // Automatically navigate if confirmation is off
       navigate('/');
     } catch (error: any) {
       console.error('Signup Error:', error.message);

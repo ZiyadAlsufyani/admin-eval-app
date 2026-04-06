@@ -18,37 +18,35 @@ export default function SignUpScreen() {
     setErrorMsg('');
 
     try {
-      // Step 1: Create the Auth Engine Identity
+      // Step 1: Fire the Atomic Trigger Payload
+      // (The Postgres handle_new_user trigger intercepts this and builds the Tenant!)
       const { data: userAuth, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            school_name: schoolName,
+            role: 'principal'
+          }
+        }
       });
 
       if (authError) throw authError;
-      if (!userAuth.user) throw new Error('فشل إنشاء الحساب. تأكد من البيانات.');
 
-      // Step 2: Establish the Tenant (School)
-      const { data: schoolResult, error: schoolError } = await supabase
-        .from('schools')
-        .insert([{ name: schoolName, status: 'pending' }])
-        .select('id')
-        .single();
+      // Check if Email Confirmation is enforcing a lock
+      if (!userAuth.session) {
+        setFullName('');
+        setEmail('');
+        setSchoolName('');
+        setPassword('');
+        setErrorMsg('تم إنشاء حسابك بنجاح! يرجى مراجعة صندوق الوارد (أو مجلد البريد المزعج) لتفعيل حسابك قبل تسجيل الدخول.');
+        // Change the error box to a success color via local state if we want, or just let errorMsg display the success text.
+        // Actually, to make it green, lets just use a generic alert. But for simplicity, reusing errorMsg works as an alert box.
+        return; 
+      }
 
-      if (schoolError) throw schoolError;
-
-      // Step 3: Bind the Profile 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userAuth.user.id,
-          full_name: fullName,
-          role: 'principal',
-          school_id: schoolResult.id,
-        });
-
-      if (profileError) throw profileError;
-
-      // Navigate to home (AuthProvider will catch the session and automatically route to /waiting-room)
+      // Automatically navigate if confirmation is off
       navigate('/');
     } catch (error: any) {
       console.error('Signup Error:', error.message);
