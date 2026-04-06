@@ -60,21 +60,18 @@ export default function SignUpScreen() {
 
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col items-center selection:bg-primary-container selection:text-on-primary-container" dir="rtl">
-      {/* TopAppBar */}
-      <header className="w-full top-0 sticky z-50 bg-surface flex flex-row-reverse justify-between items-center px-4 py-3 shadow-sm border-b border-outline-variant/10">
-        <div className="flex items-center gap-2">
-          <Icon name="ClipboardCheck" size={28} className="text-primary" />
-          <span className="text-lg font-bold tracking-tighter text-primary">تقييماتي</span>
-        </div>
+      {/* Floating Back Button */}
+      <div className="w-full max-w-md mx-auto px-4 pt-6 flex justify-start z-50">
         <button 
           onClick={() => navigate('/login')}
-          className="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-xl transition-all duration-200"
+          className="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-xl transition-all duration-200 active:scale-95"
+          title="العودة"
         >
           <Icon name="ArrowRight" size={24} />
         </button>
-      </header>
+      </div>
 
-      <main className="w-full max-w-md px-6 pt-8 flex flex-col flex-grow">
+      <main className="w-full max-w-md px-6 pt-4 flex flex-col flex-grow mx-auto">
         {/* Header Section */}
         <section className="mb-10 text-right">
           <h1 className="text-[2.75rem] font-extrabold tracking-tight text-on-surface leading-[1.1] mb-2 font-headline">
