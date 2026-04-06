@@ -1,10 +1,13 @@
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@/components/ui/icon';
+import { supabase } from '@/lib/supabase';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 
 export default function DashboardScreen() {
   const { staffList } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Derived Statistics from arbitrary number of staff
   const staffCount = staffList.length;
@@ -31,8 +34,15 @@ export default function DashboardScreen() {
               src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png" 
             />
           </div>
-          <button aria-label="الإشعارات" className="text-vertex-teal p-2 hover:bg-vertex-teal/10 rounded-full transition-transform active:scale-95 duration-200">
-            <Icon name="Bell" size={24} />
+          <button 
+            onClick={async () => {
+              await supabase.auth.signOut();
+              queryClient.clear();
+            }}
+            aria-label="تسجيل الخروج" 
+            className="text-error p-2 hover:bg-error/10 rounded-full transition-transform active:scale-95 duration-200"
+          >
+            <Icon name="LogOut" size={24} />
           </button>
         </div>
         <div className="flex flex-col items-end">
