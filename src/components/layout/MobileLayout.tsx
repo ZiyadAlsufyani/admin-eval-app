@@ -30,12 +30,12 @@ export function MobileLayout() {
   const currentPath = location.pathname;
   let activeTab = 'home';
   if (currentPath === '/tasks') activeTab = 'tasks';
-  if (currentPath === '/reports') activeTab = 'reports';
+  if (currentPath.startsWith('/staff')) activeTab = 'staff';
 
   const handleNavigation = (id: string) => {
-    if (id === 'home') navigate('/');
+    if (id === 'home') navigate('/admin-dashboard');
     if (id === 'tasks') navigate('/tasks');
-    if (id === 'reports') navigate('/reports');
+    if (id === 'staff') navigate('/staff');
   };
 
   if (isLoading) {
@@ -53,9 +53,9 @@ export function MobileLayout() {
         activeId={activeTab}
         onNavigate={handleNavigation}
         items={[
-          { id: 'reports', label: 'التقارير', icon: 'FileText', href: '/reports' },
+          { id: 'home', label: 'الرئيسية', icon: 'Home', href: '/admin-dashboard' },
           { id: 'tasks', label: 'المهام', icon: 'CheckSquare', href: '/tasks' },
-          { id: 'home', label: 'الرئيسية', icon: 'Home', href: '/' },
+          { id: 'staff', label: 'الاداريين', icon: 'Users', href: '/staff' },
         ]}
       />
     </div>
