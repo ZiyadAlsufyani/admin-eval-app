@@ -107,17 +107,17 @@ export default function StaffSignUpScreen() {
           {/* Email Field (Pre-filled logic applied) */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-secondary mr-2 tracking-wide uppercase">البريد الإلكتروني المخصص للدعوة</label>
-            <div className="relative flex items-center bg-surface-container-low border border-outline-variant/30 rounded-xl group focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 transition-all duration-300 opacity-90">
+            <div className="relative flex items-center bg-surface-container-highest border border-outline-variant/50 rounded-xl opacity-60 cursor-not-allowed transition-all duration-300">
               <input 
                 required 
+                readOnly
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-transparent border-0 focus:ring-0 px-4 py-4 pr-12 text-on-surface font-medium outline-none" 
+                className="w-full bg-transparent border-0 focus:ring-0 px-4 py-4 pr-12 text-on-surface font-bold outline-none cursor-not-allowed" 
                 placeholder="example@school.com" 
                 type="email"
                 dir="ltr"
               />
-              <Icon name="Mail" size={20} className="absolute right-4 text-outline group-focus-within:text-secondary transition-colors duration-300" />
+              <Icon name="Lock" size={20} className="absolute right-4 text-outline" title="هذا الحقل مغلق لدواعي أمنية" />
             </div>
           </div>
 

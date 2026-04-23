@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useStaffQuery } from '@/api/staff';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@/components/ui/icon';
+import emailjs from '@emailjs/browser';
 
 export default function StaffManagementScreen() {
   const navigate = useNavigate();
@@ -42,15 +43,41 @@ export default function StaffManagementScreen() {
 
     try {
       // The back-end RLS uses get_my_school_id(), but we need to insert the record natively.
-      const { data: profile } = await supabase.from('profiles').select('school_id').single();
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('school_id, schools(name)')
+        .single();
       
-      if (!profile?.school_id) throw new Error('Could not identify school');
+      if (profileErr || !profile?.school_id) throw new Error('Could not identify school');
 
-      const { error } = await supabase
+      const { error: insertErr } = await supabase
         .from('staff_invitations')
         .insert([{ email: inviteEmail, school_id: profile.school_id }]);
 
-      if (error) throw error;
+      if (insertErr) throw insertErr;
+
+      // Dispatch the physical email
+      const schoolName = (profile.schools as any)?.name || 'إدارة المدرسة';
+      const inviteLink = `${window.location.origin}/signup/staff?email=${encodeURIComponent(inviteEmail)}`;
+
+      const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+      if (serviceId && templateId && publicKey) {
+        await emailjs.send(
+          serviceId,
+          templateId,
+          {
+            to_email: inviteEmail,
+            school_name: schoolName,
+            invite_link: inviteLink,
+          },
+          publicKey
+        );
+      } else {
+        console.warn('EmailJS environment variables are missing. Invitation saved to database only.');
+      }
 
       setInviteEmail('');
       setIsInviteModalOpen(false);
