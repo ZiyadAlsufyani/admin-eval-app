@@ -41,7 +41,7 @@ export function LoginScreen() {
           <img
             alt="Vertex Insight Logo"
             className="h-24 w-auto drop-shadow-[0_4px_10px_rgba(13,148,136,0.1)]"
-            src="https://lh3.googleusercontent.com/aida/ADBb0uhx5ZobpNJn7NSKgv8Whxbjzplt94AeLD5vXvM4xKbw1zXpc1KcpeMjs2euWIx_GZS064e709IhLsBWa8ucEOe1bhEPZBIkWeaAq5f_BboDQ9dfxnSv8Tce5AhTOWqXoQw6ofFJ70_CTvM_cj-ebqB3yNQIyW1Ibete8lJP9Y6NFbwmu8JPu6jFybQy5bXmXXPP50J0eDeRTvS10pnHyI6e_luBwM-pGc76RDKwtWjmtOwlTJGTJ2LagOFTs6ntE8GRUEi0t5583Q"
+            src="/logo-solid-512x512.png"
           />
         </div>
       </header>
@@ -139,9 +139,9 @@ export function LoginScreen() {
       </main>
 
       <footer className="w-full py-10 text-center">
-        <p className="text-[11px] text-on-surface-variant/60 font-medium uppercase tracking-[0.2em]">
+        {/* <p className="text-[11px] text-on-surface-variant/60 font-medium uppercase tracking-[0.2em]">
           VERTEX INSIGHT SOLUTIONS 2024 ©
-        </p>
+        </p> */}
       </footer>
     </div>
   );
