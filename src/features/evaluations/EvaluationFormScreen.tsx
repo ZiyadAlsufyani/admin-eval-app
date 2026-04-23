@@ -1,19 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
+import { formatISODate } from '@/utils/date';
 
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
-  const { staffList, updateStaffStatus } = useOutletContext<StaffOutletContext>();
+  const { staffList, updateStaffStatus, selectedEvaluationWeek } = useOutletContext<StaffOutletContext>();
+  const { profile } = useAuth();
 
-  // Find the exact staff member being evaluated
   const staff = staffList.find(s => s.id === staffId);
+  const weekStartDateString = formatISODate(selectedEvaluationWeek);
 
-  // Local state to store ratings (mock form state)
+  // Queries and Mutations
+  const { data: existingEvaluation, isLoading: isFetching } = useEvaluationQuery(staffId || '', weekStartDateString);
+  const { mutateAsync: saveEvaluation, isPending: isSaving } = useSaveEvaluationMutation();
+
+  // Local state to store ratings
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [justifications, setJustifications] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
+
+  // Hydrate form if a draft exists
+  useEffect(() => {
+    if (existingEvaluation) {
+      setNotes(existingEvaluation.general_notes || '');
+      const newRatings: Record<string, number> = {};
+      const newJustifs: Record<string, string> = {};
+      
+      existingEvaluation.details.forEach((detail: any) => {
+        newRatings[detail.category_name] = detail.score;
+        if (detail.justification_notes) {
+          newJustifs[detail.category_name] = detail.justification_notes;
+        }
+      });
+      
+      setRatings(newRatings);
+      setJustifications(newJustifs);
+    }
+  }, [existingEvaluation]);
 
   // Protect against null staff cases (e.g. manual URL navigation to an invalid ID)
   if (!staff) {
@@ -36,18 +64,68 @@ export default function EvaluationFormScreen() {
     setRatings(prev => ({ ...prev, [questionId]: score }));
   };
 
-  const handleSaveDraft = () => {
-    // Write global context so the list screen switches to "Complete Form" mode
-    updateStaffStatus(staff.id, { isDraft: true });
-    navigate(-1);
+  const handleJustification = (questionId: string, text: string) => {
+    setJustifications(prev => ({ ...prev, [questionId]: text }));
   };
 
-  const handleSubmit = () => {
-    // In a real app, this would POST to a server.
-    // Here we can just clear the draft status and update task completion logic
-    updateStaffStatus(staff.id, { status: 'اليوم', isDraft: false }); // Fictional logic to close task
-    navigate(-1);
+  const buildPayload = (status: 'draft' | 'submitted') => {
+    if (!profile || !staff) return null;
+
+    const details = QUESTIONS.map(q => ({
+      category_name: q.id,
+      score: ratings[q.id] || 0,
+      justification_notes: justifications[q.id] || '',
+    }));
+
+    // Calculate percentage based on max 5 per question
+    const answeredCount = QUESTIONS.filter(q => ratings[q.id]).length;
+    const totalScore = QUESTIONS.reduce((sum, q) => sum + (ratings[q.id] || 0), 0);
+    const overall_score_percentage = answeredCount > 0 ? Math.round((totalScore / (QUESTIONS.length * 5)) * 100) : 0;
+
+    return {
+      school_id: profile.school_id,
+      staff_id: staff.id,
+      evaluator_id: profile.id,
+      academic_year: '2024-2025',
+      week_start_date: weekStartDateString,
+      status,
+      general_notes: notes,
+      overall_score_percentage,
+      details,
+    };
   };
+
+  const handleSaveDraft = async () => {
+    const payload = buildPayload('draft');
+    if (!payload) return;
+    try {
+      await saveEvaluation(payload);
+      updateStaffStatus(staff.id, { isDraft: true });
+      navigate(-1);
+    } catch (e) {
+      alert('حدث خطأ أثناء حفظ المسودة');
+    }
+  };
+
+  const handleSubmit = async () => {
+    const payload = buildPayload('submitted');
+    if (!payload) return;
+    try {
+      await saveEvaluation(payload);
+      updateStaffStatus(staff.id, { status: 'مكتمل', isDraft: false }); 
+      navigate(-1);
+    } catch (e) {
+      alert('حدث خطأ أثناء الإرسال');
+    }
+  };
+
+  if (isFetching) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-surface">
+        <h2 className="text-xl font-bold text-vertex-teal">جاري تحميل البيانات...</h2>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
@@ -118,6 +196,8 @@ export default function EvaluationFormScreen() {
                 {/* Optional Justification */}
                 <div className="flex gap-2 items-start mt-2">
                   <textarea 
+                    value={justifications[q.id] || ''}
+                    onChange={(e) => handleJustification(q.id, e.target.value)}
                     className="flex-1 text-[11px] p-2.5 bg-surface-container border-none rounded-lg focus:ring-2 focus:ring-vertex-teal min-h-[60px] resize-none" 
                     placeholder="أضف مبررات التقييم..."
                   />
@@ -153,15 +233,17 @@ export default function EvaluationFormScreen() {
         <div className="pt-4 flex flex-col gap-3">
           <button 
             onClick={handleSubmit}
-            className="w-full py-4 bg-vertex-teal text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform"
+            disabled={isSaving}
+            className="w-full py-4 bg-vertex-teal text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50"
           >
-            إرسال التقييم
+            {isSaving ? 'جاري الإرسال...' : 'إرسال التقييم'}
           </button>
           <button 
             onClick={handleSaveDraft}
-            className="w-full py-4 bg-surface-container text-foreground font-bold rounded-xl active:scale-95 transition-transform"
+            disabled={isSaving}
+            className="w-full py-4 bg-surface-container text-foreground font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50"
           >
-            حفظ مسودة
+            {isSaving ? 'جاري الحفظ...' : 'حفظ مسودة'}
           </button>
         </div>
       </main>

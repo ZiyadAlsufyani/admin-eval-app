@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
+import { getRecentWeeks } from '@/utils/date';
 
 export default function PendingEvaluationsScreen() {
-  const { staffList } = useOutletContext<StaffOutletContext>();
+  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
+  const [isWeekPickerOpen, setIsWeekPickerOpen] = useState(false);
+  const recentWeeks = getRecentWeeks(5);
 
   // Stats calculation
   const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'متأخر').length;
@@ -42,9 +46,13 @@ export default function PendingEvaluationsScreen() {
                 {String(totalPending).padStart(2, '0')}
               </h2>
             </div>
-            <div className="bg-white/20 p-3 rounded-lg relative z-10">
-              <Icon name="FileClock" size={24} className="text-white" />
-            </div>
+            <button 
+              onClick={() => setIsWeekPickerOpen(true)}
+              className="bg-white/20 p-3 rounded-lg relative z-10 hover:bg-white/30 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+              aria-label="اختيار الأسبوع"
+            >
+              <Icon name="Calendar" size={24} className="text-white" />
+            </button>
             {/* Soft decorative blur inside the main bento box */}
             <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           </div>
@@ -140,6 +148,53 @@ export default function PendingEvaluationsScreen() {
           </div>
         </section>
       </main>
+
+      {/* Week Picker Modal */}
+      {isWeekPickerOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setIsWeekPickerOpen(false)}>
+          <div 
+            className="bg-surface w-full max-w-md rounded-t-2xl p-6 shadow-2xl pb-safe border-t border-surface-container animate-in slide-in-from-bottom-full duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-foreground">اختر أسبوع التقييم</h3>
+              <button 
+                onClick={() => setIsWeekPickerOpen(false)}
+                className="p-2 rounded-full hover:bg-surface-container text-secondary transition-colors"
+              >
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {recentWeeks.map((week, idx) => {
+                // simple comparison by time
+                const isSelected = week.start.getTime() === selectedEvaluationWeek.getTime();
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSelectedEvaluationWeek(week.start);
+                      setIsWeekPickerOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
+                      isSelected 
+                        ? 'bg-vertex-teal/10 border-vertex-teal text-vertex-teal border' 
+                        : 'bg-surface-container hover:bg-surface-container-high text-foreground border border-transparent'
+                    }`}
+                  >
+                    <div>
+                      <span className="block font-bold">{week.label}</span>
+                      <span className="text-xs text-secondary">{week.shortFormat}</span>
+                    </div>
+                    {isSelected && <Icon name="CheckCircle2" size={20} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
