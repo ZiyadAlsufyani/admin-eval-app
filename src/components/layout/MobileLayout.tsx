@@ -3,6 +3,7 @@ import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStaffQuery } from '@/api/staff';
 import { useQueryClient } from '@tanstack/react-query';
 import type { StaffMember } from '@/types/staff';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export type StaffOutletContext = {
   staffList: StaffMember[];
@@ -13,6 +14,9 @@ export function MobileLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  
+  const isPrincipal = profile?.role === 'principal';
   
   // Fetch real data via TanStack + Supabase
   const { data: staffList = [], isLoading } = useStaffQuery();
@@ -33,12 +37,12 @@ export function MobileLayout() {
   if (currentPath.startsWith('/staff')) activeTab = 'staff';
 
   const handleNavigation = (id: string) => {
-    if (id === 'home') navigate('/admin-dashboard');
+    if (id === 'home') navigate(isPrincipal ? '/admin-dashboard' : '/staff-dashboard');
     if (id === 'tasks') navigate('/tasks');
     if (id === 'staff') navigate('/staff');
   };
 
-  if (isLoading) {
+  if (isLoading && isPrincipal) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center font-bold text-foreground">
         جاري تحميل البيانات...
@@ -46,17 +50,21 @@ export function MobileLayout() {
     );
   }
 
+  const navItems = isPrincipal ? [
+    { id: 'home', label: 'الرئيسية', icon: 'Home' as const, href: '/admin-dashboard' },
+    { id: 'tasks', label: 'المهام', icon: 'CheckSquare' as const, href: '/tasks' },
+    { id: 'staff', label: 'الاداريين', icon: 'Users' as const, href: '/staff' },
+  ] : [
+    { id: 'home', label: 'الرئيسية', icon: 'Home' as const, href: '/staff-dashboard' },
+  ];
+
   return (
-    <div className="min-h-screen bg-surface w-full max-w-md mx-auto relative shadow-2xl">
+    <div className="min-h-screen bg-surface w-full max-w-md mx-auto relative shadow-2xl pb-20">
       <Outlet context={{ staffList, updateStaffStatus }} />
       <BottomNav
         activeId={activeTab}
         onNavigate={handleNavigation}
-        items={[
-          { id: 'home', label: 'الرئيسية', icon: 'Home', href: '/admin-dashboard' },
-          { id: 'tasks', label: 'المهام', icon: 'CheckSquare', href: '/tasks' },
-          { id: 'staff', label: 'الاداريين', icon: 'Users', href: '/staff' },
-        ]}
+        items={navItems}
       />
     </div>
   );
