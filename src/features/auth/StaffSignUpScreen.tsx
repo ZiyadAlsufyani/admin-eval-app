@@ -117,7 +117,7 @@ export default function StaffSignUpScreen() {
                 type="email"
                 dir="ltr"
               />
-              <Icon name="Lock" size={20} className="absolute right-4 text-outline" title="هذا الحقل مغلق لدواعي أمنية" />
+              <Icon name="Lock" size={20} className="absolute right-4 text-outline" />
             </div>
           </div>
 
