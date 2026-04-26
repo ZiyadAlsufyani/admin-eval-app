@@ -6,8 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { StaffMember } from '@/types/staff';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { getStartOfWeek, formatISODate } from '@/utils/date';
-import { useAcademicTermsQuery } from '@/api/academic';
-import { getAcademicContext, type AcademicContext } from '@/utils/academicCalendar';
+import { useAcademicTermsQuery, useHolidaysQuery } from '@/api/academic';
+import { getAcademicContext, type AcademicContext, type Holiday } from '@/utils/academicCalendar';
 
 export type StaffOutletContext = {
   staffList: StaffMember[];
@@ -16,6 +16,7 @@ export type StaffOutletContext = {
   setSelectedEvaluationWeek: (date: Date) => void;
   academicContext: AcademicContext | null;
   currentAcademicContext: AcademicContext | null;
+  holidays: Holiday[];
 };
 
 export function MobileLayout() {
@@ -27,15 +28,17 @@ export function MobileLayout() {
   
   const isPrincipal = profile?.role === 'principal';
   
-  // Fetch terms and calculate academic context
+  // Fetch terms, holidays, and calculate academic context
   const { data: terms = [], isLoading: isTermsLoading } = useAcademicTermsQuery();
-  const academicContext = getAcademicContext(selectedEvaluationWeek, terms);
-  const currentAcademicContext = getAcademicContext(new Date(), terms);
+  const { data: holidays = [], isLoading: isHolidaysLoading } = useHolidaysQuery();
+  
+  const academicContext = getAcademicContext(selectedEvaluationWeek, terms, holidays);
+  const currentAcademicContext = getAcademicContext(new Date(), terms, holidays);
 
   // Fetch real data via TanStack + Supabase
   const { data: staffList = [], isLoading: isStaffLoading } = useStaffQuery(selectedEvaluationWeek);
 
-  const isLoading = isTermsLoading || isStaffLoading;
+  const isLoading = isTermsLoading || isHolidaysLoading || isStaffLoading;
 
   // Create a bridging function that updates the TanStack cache directly 
   // (acting exactly like our old mock hook but for real data caching)
@@ -83,7 +86,8 @@ export function MobileLayout() {
         selectedEvaluationWeek, 
         setSelectedEvaluationWeek,
         academicContext,
-        currentAcademicContext
+        currentAcademicContext,
+        holidays
       }} />
       <BottomNav
         activeId={activeTab}

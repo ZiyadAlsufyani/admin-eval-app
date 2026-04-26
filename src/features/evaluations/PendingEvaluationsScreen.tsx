@@ -5,13 +5,13 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { getTermWeeks } from '@/utils/academicCalendar';
 
 export default function PendingEvaluationsScreen() {
-  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext, currentAcademicContext } = useOutletContext<StaffOutletContext>();
+  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext, currentAcademicContext, holidays } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const [isWeekPickerOpen, setIsWeekPickerOpen] = useState(false);
   
   const recentWeeks = currentAcademicContext 
-    ? getTermWeeks(currentAcademicContext.activeTerm, currentAcademicContext.weekNumber)
-    : (academicContext ? getTermWeeks(academicContext.activeTerm, academicContext.weekNumber) : []);
+    ? getTermWeeks(currentAcademicContext.activeTerm, currentAcademicContext.weekNumber, holidays)
+    : (academicContext ? getTermWeeks(academicContext.activeTerm, academicContext.weekNumber, holidays) : []);
 
   // Stats calculation
   const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'مسودة').length;
@@ -37,10 +37,20 @@ export default function PendingEvaluationsScreen() {
 
       <main className="px-6 pt-4 space-y-6">
         
-        {!academicContext ? (
+        {(!academicContext || academicContext.isHoliday) ? (
           <div className="text-center p-8 mt-12 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
             <Icon name="Calendar" size={48} className="mx-auto text-outline-variant mb-4 opacity-50" />
-            <p className="text-secondary font-medium text-lg">لا توجد تقييمات حالية. إجازة سعيدة!</p>
+            <p className="text-secondary font-medium text-lg">
+              {!academicContext ? "لا توجد تقييمات حالية. إجازة سعيدة!" : "هذا الأسبوع يوافق إجازة رسمية. إجازة سعيدة!"}
+            </p>
+            {recentWeeks.length > 0 && (
+              <button 
+                onClick={() => setIsWeekPickerOpen(true)}
+                className="mt-6 px-6 py-2.5 bg-vertex-teal text-white rounded-xl hover:bg-vertex-teal/90 transition-colors font-bold shadow-md shadow-vertex-teal/20"
+              >
+                اختر أسبوعاً آخر
+              </button>
+            )}
           </div>
         ) : (
           <>

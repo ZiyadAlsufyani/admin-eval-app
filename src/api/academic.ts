@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { AcademicTerm } from '@/utils/academicCalendar';
+import type { AcademicTerm, Holiday } from '@/utils/academicCalendar';
 
 export const useAcademicTermsQuery = () => {
   return useQuery({
@@ -17,6 +17,25 @@ export const useAcademicTermsQuery = () => {
       }
 
       return data as AcademicTerm[];
+    },
+    staleTime: 1000 * 60 * 60 * 24, // Cache for 24 hours
+  });
+};
+
+export const useHolidaysQuery = () => {
+  return useQuery({
+    queryKey: ['holidays'],
+    queryFn: async (): Promise<Holiday[]> => {
+      const { data, error } = await supabase
+        .from('holidays')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching holidays:', error);
+        throw error;
+      }
+
+      return data as Holiday[];
     },
     staleTime: 1000 * 60 * 60 * 24, // Cache for 24 hours
   });
