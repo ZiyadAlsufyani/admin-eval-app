@@ -9,7 +9,7 @@ import { formatISODate } from '@/utils/date';
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
-  const { staffList, updateStaffStatus, selectedEvaluationWeek } = useOutletContext<StaffOutletContext>();
+  const { staffList, updateStaffStatus, selectedEvaluationWeek, academicContext } = useOutletContext<StaffOutletContext>();
   const { profile } = useAuth();
 
   const staff = staffList.find(s => s.id === staffId);
@@ -86,11 +86,13 @@ export default function EvaluationFormScreen() {
       school_id: profile.school_id,
       staff_id: staff.id,
       evaluator_id: profile.id,
-      academic_year: '2024-2025',
+      academic_year: academicContext?.activeTerm.academic_year || '2024-2025',
       week_start_date: weekStartDateString,
       status,
       general_notes: notes,
       overall_score_percentage,
+      term_id: academicContext?.activeTerm.id,
+      academic_week_number: academicContext?.weekNumber,
       details,
     };
   };

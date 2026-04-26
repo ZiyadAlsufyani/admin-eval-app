@@ -6,12 +6,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { StaffMember } from '@/types/staff';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { getStartOfWeek, formatISODate } from '@/utils/date';
+import { useAcademicTermsQuery } from '@/api/academic';
+import { getAcademicContext, type AcademicContext } from '@/utils/academicCalendar';
 
 export type StaffOutletContext = {
   staffList: StaffMember[];
   updateStaffStatus: (id: string, updates: Partial<StaffMember>) => void;
   selectedEvaluationWeek: Date;
   setSelectedEvaluationWeek: (date: Date) => void;
+  academicContext: AcademicContext | null;
 };
 
 export function MobileLayout() {
@@ -23,8 +26,14 @@ export function MobileLayout() {
   
   const isPrincipal = profile?.role === 'principal';
   
+  // Fetch terms and calculate academic context
+  const { data: terms = [], isLoading: isTermsLoading } = useAcademicTermsQuery();
+  const academicContext = getAcademicContext(selectedEvaluationWeek, terms);
+
   // Fetch real data via TanStack + Supabase
-  const { data: staffList = [], isLoading } = useStaffQuery(selectedEvaluationWeek);
+  const { data: staffList = [], isLoading: isStaffLoading } = useStaffQuery(selectedEvaluationWeek);
+
+  const isLoading = isTermsLoading || isStaffLoading;
 
   // Create a bridging function that updates the TanStack cache directly 
   // (acting exactly like our old mock hook but for real data caching)
@@ -70,7 +79,8 @@ export function MobileLayout() {
         staffList, 
         updateStaffStatus, 
         selectedEvaluationWeek, 
-        setSelectedEvaluationWeek 
+        setSelectedEvaluationWeek,
+        academicContext
       }} />
       <BottomNav
         activeId={activeTab}

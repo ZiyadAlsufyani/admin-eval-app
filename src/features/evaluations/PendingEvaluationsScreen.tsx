@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
-import { getRecentWeeks } from '@/utils/date';
+import { getTermWeeks } from '@/utils/academicCalendar';
 
 export default function PendingEvaluationsScreen() {
-  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek } = useOutletContext<StaffOutletContext>();
+  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const [isWeekPickerOpen, setIsWeekPickerOpen] = useState(false);
-  const recentWeeks = getRecentWeeks(5);
+  
+  const recentWeeks = academicContext 
+    ? getTermWeeks(academicContext.activeTerm, academicContext.weekNumber)
+    : [];
 
   // Stats calculation
   const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'متأخر').length;
@@ -78,14 +81,27 @@ export default function PendingEvaluationsScreen() {
           </div>
         </section>
 
-        {/* Main List Section */}
-        <section className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold text-foreground">قائمة الموظفين</h3>
-            <span className="text-vertex-teal text-sm font-semibold cursor-pointer">عرض الكل</span>
+        {!academicContext ? (
+          <div className="text-center p-8 mt-12 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
+            <Icon name="Calendar" size={48} className="mx-auto text-outline-variant mb-4 opacity-50" />
+            <p className="text-secondary font-medium text-lg">لا توجد تقييمات حالية. إجازة سعيدة!</p>
           </div>
+        ) : (
+          <section className="space-y-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-foreground">قائمة الموظفين</h3>
+              <span className="text-vertex-teal text-sm font-semibold cursor-pointer">عرض الكل</span>
+            </div>
 
-          <div className="space-y-4">
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-surface-container rounded-lg border border-outline-variant/20">
+              <span className="text-xs font-bold text-secondary">{academicContext.activeTerm.academic_year}</span>
+              <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+              <span className="text-xs font-bold text-secondary">{academicContext.activeTerm.name}</span>
+              <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+              <span className="text-xs font-bold text-vertex-teal">الأسبوع {academicContext.weekNumber}</span>
+            </div>
+
+            <div className="space-y-4">
             {staffList.filter(s => s.status).map((staff) => {
               const isCompleted = staff.status === 'مكتمل';
               const isDraft = staff.status === 'مسودة';
@@ -147,6 +163,7 @@ export default function PendingEvaluationsScreen() {
             })}
           </div>
         </section>
+        )}
       </main>
 
       {/* Week Picker Modal */}
@@ -166,7 +183,7 @@ export default function PendingEvaluationsScreen() {
               </button>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-2 pb-8 max-h-[60vh] overflow-y-auto">
               {recentWeeks.map((week, idx) => {
                 // simple comparison by time
                 const isSelected = week.start.getTime() === selectedEvaluationWeek.getTime();
@@ -184,8 +201,8 @@ export default function PendingEvaluationsScreen() {
                     }`}
                   >
                     <div>
-                      <span className="block font-bold">{week.label}</span>
-                      <span className="text-xs text-secondary">{week.shortFormat}</span>
+                      <span className="block font-bold text-right">{week.label}</span>
+                      <span className="text-xs text-secondary text-right block">{week.shortFormat}</span>
                     </div>
                     {isSelected && <Icon name="CheckCircle2" size={20} />}
                   </button>

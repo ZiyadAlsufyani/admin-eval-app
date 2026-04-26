@@ -17,6 +17,8 @@ export type SaveEvaluationPayload = {
   status: 'draft' | 'submitted';
   general_notes?: string;
   overall_score_percentage?: number;
+  term_id?: string;
+  academic_week_number?: number;
   details: EvaluationDetail[];
 };
 
@@ -66,6 +68,8 @@ export function useSaveEvaluationMutation() {
         p_status: payload.status,
         p_general_notes: payload.general_notes || null,
         p_overall_score_percentage: payload.overall_score_percentage || null,
+        p_term_id: payload.term_id || null,
+        p_academic_week_number: payload.academic_week_number || null,
         p_details: payload.details,
       });
 
