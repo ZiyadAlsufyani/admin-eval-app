@@ -11,7 +11,7 @@ export type StaffMember = {
   avatarUrl?: string;
   subject?: string; // Evaluated subject (e.g. الرياضيات)
   dueDate?: string; // Date string for evaluations
-  status?: 'اليوم' | 'متأخر' | 'معلق' | 'مكتمل'; // Task deadline state
+  status?: 'اليوم' | 'متأخر' | 'معلق' | 'مكتمل' | 'مسودة'; // Task deadline state
   isDraft?: boolean; // Form partially completed, waiting submission
   metrics: Record<string, EvaluationMetric>; // Map of metric ID to the actual score object
 };

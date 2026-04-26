@@ -131,16 +131,11 @@ export default function EvaluationFormScreen() {
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
       {/* TopAppBar */}
       <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-none border-b border-surface-container pt-safe">
-        <div className="flex flex-row-reverse justify-between items-center w-full px-6 h-16">
-          <div className="flex items-center gap-4">
-            <button aria-label="العودة" onClick={() => navigate(-1)} className="text-secondary hover:bg-surface-container/50 transition-colors p-2 rounded-full cursor-pointer">
-              <Icon name="ArrowRight" size={24} />
-            </button>
-            <h1 className="font-bold tracking-tight text-foreground text-lg">فيرتكس إنسايت</h1>
-          </div>
-          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-vertex-teal">
-            <img alt="User Avatar" className="w-full h-full object-cover" src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png" />
-          </div>
+        <div className="flex items-center gap-4 w-full px-6 h-16">
+          <button aria-label="العودة" onClick={() => navigate(-1)} className="text-secondary hover:bg-surface-container/50 transition-colors p-2 rounded-full cursor-pointer">
+            <Icon name="ArrowRight" size={24} />
+          </button>
+          <h1 className="font-bold tracking-tight text-foreground text-lg">تقييم {staff.name}</h1>
         </div>
       </header>
 
@@ -153,7 +148,7 @@ export default function EvaluationFormScreen() {
             <span className="text-xs font-semibold text-secondary">الاسبوع 14</span>
           </div>
           <div className="flex gap-4 items-center pt-2">
-            <img src={staff.avatarUrl} alt={staff.name} className="w-16 h-16 rounded-xl object-cover shadow-sm bg-surface-container" />
+            <img src={staff.avatarUrl || `https://ui-avatars.com/api/?name=${staff.name}&background=random`} alt={staff.name} className="w-16 h-16 rounded-xl object-cover shadow-sm bg-surface-container" />
             <div>
               <h2 className="text-lg font-bold text-foreground">{staff.name}</h2>
               <p className="text-sm font-medium text-secondary">{staff.subject || staff.role}</p>

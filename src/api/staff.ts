@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types/staff';
+import { formatISODate } from '@/utils/date';
 
-export function useStaffQuery() {
+export function useStaffQuery(weekStartDate?: Date) {
+  const weekString = weekStartDate ? formatISODate(weekStartDate) : 'current';
   return useQuery({
-    queryKey: ['staff'],
+    queryKey: ['staff', weekString],
     queryFn: async (): Promise<StaffMember[]> => {
       // Fetch all staff members from the current principal's school
-      // Our RLS policy automatically filters this to ONLY auth.user()'s school!
-      const { data, error } = await supabase
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'staff');
@@ -17,21 +18,40 @@ export function useStaffQuery() {
         throw error;
       }
 
-      // Map from Supabase Profile schema back to UI StaffMember shape
-      return data.map((profile: any): StaffMember => ({
-        id: profile.id,
-        name: profile.full_name,
-        role: profile.job_title || 'معلم',
-        avatarUrl: profile.avatar_url,
-        subject: profile.job_title,
-        dueDate: 'اليوم، 04:00 م', // Placeholder until evaluations table is wired
-        status: 'اليوم',           // Placeholder until evaluations table is wired
-        isDraft: false,
-        metrics: {
-          discipline: { id: 'discipline', name: 'الانضباط', score: Math.floor(Math.random() * 20) + 80 },
-          competencies: { id: 'competencies', name: 'الجدارات', score: Math.floor(Math.random() * 20) + 80 },
+      // Fetch evaluations for the specific week
+      let evaluations: any[] = [];
+      if (weekStartDate) {
+        const { data: evalData, error: evalErr } = await supabase
+          .from('discipline_evaluations')
+          .select('staff_id, status')
+          .eq('week_start_date', weekString);
+          
+        if (!evalErr && evalData) {
+          evaluations = evalData;
         }
-      }));
+      }
+
+      // Map from Supabase Profile schema back to UI StaffMember shape
+      return profiles.map((profile: any): StaffMember => {
+        const evaluation = evaluations.find(e => e.staff_id === profile.id);
+        const isDraft = evaluation?.status === 'draft';
+        const isCompleted = evaluation?.status === 'submitted';
+
+        return {
+          id: profile.id,
+          name: profile.full_name,
+          role: profile.job_title || 'الاداري/ة',
+          avatarUrl: profile.avatar_url,
+          subject: profile.job_title,
+          dueDate: 'الخميس، 04:00 م',
+          status: isCompleted ? 'مكتمل' : isDraft ? 'مسودة' : 'معلق',
+          isDraft,
+          metrics: {
+            discipline: { id: 'discipline', name: 'الانضباط', score: Math.floor(Math.random() * 20) + 80 },
+            competencies: { id: 'competencies', name: 'الجدارات', score: Math.floor(Math.random() * 20) + 80 },
+          }
+        };
+      });
     }
   });
 }

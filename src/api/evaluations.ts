@@ -82,7 +82,7 @@ export function useSaveEvaluationMutation() {
       });
       // Also invalidate the staff list if we are using it to track 'draft' vs 'completed' statuses
       queryClient.invalidateQueries({
-        queryKey: ['staff'],
+        queryKey: ['staff', variables.week_start_date],
       });
     },
   });

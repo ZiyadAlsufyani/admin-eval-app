@@ -5,7 +5,7 @@ import { useStaffQuery } from '@/api/staff';
 import { useQueryClient } from '@tanstack/react-query';
 import type { StaffMember } from '@/types/staff';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { getStartOfWeek } from '@/utils/date';
+import { getStartOfWeek, formatISODate } from '@/utils/date';
 
 export type StaffOutletContext = {
   staffList: StaffMember[];
@@ -24,12 +24,13 @@ export function MobileLayout() {
   const isPrincipal = profile?.role === 'principal';
   
   // Fetch real data via TanStack + Supabase
-  const { data: staffList = [], isLoading } = useStaffQuery();
+  const { data: staffList = [], isLoading } = useStaffQuery(selectedEvaluationWeek);
 
   // Create a bridging function that updates the TanStack cache directly 
   // (acting exactly like our old mock hook but for real data caching)
   const updateStaffStatus = (id: string, updates: Partial<StaffMember>) => {
-    queryClient.setQueryData<StaffMember[]>(['staff'], (old) => {
+    const weekString = formatISODate(selectedEvaluationWeek);
+    queryClient.setQueryData<StaffMember[]>(['staff', weekString], (old) => {
       if (!old) return [];
       return old.map(staff => staff.id === id ? { ...staff, ...updates } : staff);
     });

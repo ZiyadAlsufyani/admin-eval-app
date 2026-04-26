@@ -87,16 +87,16 @@ export default function PendingEvaluationsScreen() {
 
           <div className="space-y-4">
             {staffList.filter(s => s.status).map((staff) => {
-              const isLate = staff.status === 'متأخر';
-              const isToday = staff.status === 'اليوم';
+              const isCompleted = staff.status === 'مكتمل';
+              const isDraft = staff.status === 'مسودة';
 
-              const badgeColor = isLate
-                ? 'text-red-600 bg-red-500/10'
-                : isToday
+              const badgeColor = isCompleted
                 ? 'text-vertex-teal bg-vertex-teal/10'
+                : isDraft
+                ? 'text-amber-600 bg-amber-500/10'
                 : 'text-secondary bg-surface-container';
 
-              const indicatorColor = isLate ? 'bg-red-500' : isToday ? 'bg-vertex-teal' : 'bg-secondary';
+              const indicatorColor = isCompleted ? 'bg-vertex-teal' : isDraft ? 'bg-amber-500' : 'bg-secondary';
 
               return (
                 <div key={staff.id} className="bg-surface-container-lowest p-4 rounded-xl shadow-[0px_12px_32px_rgba(0,0,0,0.03)] border border-surface-container space-y-4">
