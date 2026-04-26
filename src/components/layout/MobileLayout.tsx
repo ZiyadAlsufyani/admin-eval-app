@@ -39,7 +39,7 @@ export function MobileLayout() {
   // Map route paths to valid BottomNav activeIds
   const currentPath = location.pathname;
   let activeTab = 'home';
-  if (currentPath === '/tasks') activeTab = 'tasks';
+  if (currentPath === '/tasks' || currentPath.startsWith('/evaluate')) activeTab = 'tasks';
   if (currentPath.startsWith('/staff')) activeTab = 'staff';
 
   const handleNavigation = (id: string) => {
