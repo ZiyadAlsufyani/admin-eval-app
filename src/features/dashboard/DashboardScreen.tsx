@@ -3,11 +3,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@/components/ui/icon';
 import { supabase } from '@/lib/supabase';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function DashboardScreen() {
-  const { staffList } = useOutletContext<StaffOutletContext>();
+  const { staffList, academicContext } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
 
   // Derived Statistics from arbitrary number of staff
   const staffCount = staffList.length;
@@ -46,7 +48,7 @@ export default function DashboardScreen() {
           </button>
         </div>
         <div className="flex flex-col items-end">
-          <h1 className="text-xl font-extrabold text-vertex-teal tracking-tight">سعدى الشهري</h1>
+          <h1 className="text-xl font-extrabold text-vertex-teal tracking-tight">{profile?.full_name || 'المدير'}</h1>
         </div>
       </header>
 
@@ -72,6 +74,18 @@ export default function DashboardScreen() {
             <Icon name="Clock" size={120} className="text-white/20 absolute -left-4 -bottom-4" />
           </div>
         </section>
+
+        {/* Academic Context Indicator */}
+        {academicContext && (
+          <section className="flex justify-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-surface-container-lowest rounded-full border border-surface-container shadow-sm">
+              <Icon name="Calendar" size={16} className="text-vertex-teal" />
+              <span className="text-xs font-bold text-vertex-teal">{academicContext.activeTerm.academic_year}</span>
+              <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+              <span className="text-xs font-bold text-secondary">{academicContext.activeTerm.name}</span>
+            </div>
+          </section>
+        )}
 
         {/* Statistical Summary Grid */}
         <section className="grid grid-cols-2 gap-3">

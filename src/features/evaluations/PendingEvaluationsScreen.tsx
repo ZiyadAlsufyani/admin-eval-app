@@ -14,92 +14,74 @@ export default function PendingEvaluationsScreen() {
     : [];
 
   // Stats calculation
-  const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'متأخر').length;
-  const dueToday = staffList.filter(s => s.status === 'اليوم').length;
-  const late = staffList.filter(s => s.status === 'متأخر').length;
+  const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'مسودة').length;
 
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
       
-      {/* TopAppBar */}
-      <header className="w-full top-0 sticky z-50 bg-surface/90 backdrop-blur-md border-none flex flex-row-reverse justify-between items-center px-6 py-4 pt-safe h-16">
+      <header className="w-full top-0 sticky z-50 bg-surface/90 backdrop-blur-md border-none flex justify-between items-center px-6 py-4 pt-safe h-16">
+        <h1 className="text-xl font-bold text-foreground">التقييمات المعلقة</h1>
         <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border-2 border-vertex-teal">
+            <img 
+              className="w-full h-full object-cover" 
+              alt="User Avatar" 
+              src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png"
+            />
+          </div>
           <button aria-label="الإشعارات" className="text-vertex-teal p-2 hover:bg-vertex-teal/10 rounded-full transition-transform active:scale-95 duration-200">
             <Icon name="Bell" size={24} />
           </button>
-        </div>
-        <h1 className="text-xl font-bold text-foreground">التقييمات المعلقة</h1>
-        <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border-2 border-vertex-teal">
-          <img 
-            className="w-full h-full object-cover" 
-            alt="User Avatar" 
-            src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png"
-          />
         </div>
       </header>
 
       <main className="px-6 pt-4 space-y-6">
         
-        {/* Summary Section: Editorial Bento Style */}
-        <section className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 bg-vertex-teal p-5 rounded-xl flex justify-between items-end overflow-hidden relative shadow-lg">
-            <div className="relative z-10">
-              <p className="text-white/80 text-sm font-medium">إجمالي المعلق</p>
-              <h2 className="text-4xl font-extrabold text-white tracking-tight mt-1">
-                {String(totalPending).padStart(2, '0')}
-              </h2>
-            </div>
-            <button 
-              onClick={() => setIsWeekPickerOpen(true)}
-              className="bg-white/20 p-3 rounded-lg relative z-10 hover:bg-white/30 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-              aria-label="اختيار الأسبوع"
-            >
-              <Icon name="Calendar" size={24} className="text-white" />
-            </button>
-            {/* Soft decorative blur inside the main bento box */}
-            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-          </div>
-          
-          <div className="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container">
-            <p className="text-secondary text-xs font-medium mb-1">مستحق اليوم</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-vertex-teal">
-                {String(dueToday).padStart(2, '0')}
-              </span>
-              <span className="w-2 h-2 rounded-full bg-vertex-teal"></span>
-            </div>
-          </div>
-          
-          <div className="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container">
-            <p className="text-secondary text-xs font-medium mb-1">متأخر</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-red-500">
-                {String(late).padStart(2, '0')}
-              </span>
-              <span className="w-2 h-2 rounded-full bg-red-500"></span>
-            </div>
-          </div>
-        </section>
-
         {!academicContext ? (
           <div className="text-center p-8 mt-12 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
             <Icon name="Calendar" size={48} className="mx-auto text-outline-variant mb-4 opacity-50" />
             <p className="text-secondary font-medium text-lg">لا توجد تقييمات حالية. إجازة سعيدة!</p>
           </div>
         ) : (
-          <section className="space-y-4">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-foreground">قائمة الموظفين</h3>
-              <span className="text-vertex-teal text-sm font-semibold cursor-pointer">عرض الكل</span>
-            </div>
+          <>
+            {/* Summary Section */}
+            <section className="space-y-3">
+              {/* Top Green Card */}
+              <div className="bg-vertex-teal p-6 rounded-xl flex justify-between items-center overflow-hidden relative shadow-lg">
+                <div className="relative z-10 flex flex-col gap-1">
+                  <p className="text-white/80 text-sm font-medium">
+                    {academicContext.activeTerm.academic_year} | {academicContext.activeTerm.name}
+                  </p>
+                  <h2 className="text-4xl font-extrabold text-white tracking-tight">
+                    الأسبوع {academicContext.weekNumber}
+                  </h2>
+                </div>
+                <button 
+                  onClick={() => setIsWeekPickerOpen(true)}
+                  className="bg-white/20 p-3 rounded-lg relative z-10 hover:bg-white/30 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                  aria-label="اختيار الأسبوع"
+                >
+                  <Icon name="Calendar" size={24} className="text-white" />
+                </button>
+                {/* Soft decorative blur inside the main bento box */}
+                <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+              </div>
+              
+              {/* Single white card for pending metric */}
+              <div className="bg-surface-container-lowest p-5 rounded-xl shadow-sm border border-surface-container flex justify-between items-center">
+                <p className="text-secondary font-bold text-lg">إجمالي التقييمات المعلقة</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-vertex-teal">
+                    {String(totalPending).padStart(2, '0')}
+                  </span>
+                </div>
+              </div>
+            </section>
 
-            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-surface-container rounded-lg border border-outline-variant/20">
-              <span className="text-xs font-bold text-secondary">{academicContext.activeTerm.academic_year}</span>
-              <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
-              <span className="text-xs font-bold text-secondary">{academicContext.activeTerm.name}</span>
-              <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
-              <span className="text-xs font-bold text-vertex-teal">الأسبوع {academicContext.weekNumber}</span>
-            </div>
+            <section className="space-y-4">
+              <div className="flex justify-between items-center mb-6 mt-4">
+                <h3 className="text-lg font-bold text-foreground">قائمة الموظفين</h3>
+              </div>
 
             <div className="space-y-4">
             {staffList.filter(s => s.status).map((staff) => {
@@ -139,11 +121,7 @@ export default function PendingEvaluationsScreen() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-surface-container/50">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-secondary/70 uppercase tracking-wider font-semibold">تاريخ الاستحقاق</span>
-                      <span className="text-[13px] font-bold text-foreground">{staff.dueDate}</span>
-                    </div>
+                  <div className="flex items-center justify-end pt-3 border-t border-surface-container/50">
                     {staff.isDraft ? (
                       <button 
                         onClick={() => navigate(`/evaluate/${staff.id}`)}
@@ -163,6 +141,7 @@ export default function PendingEvaluationsScreen() {
             })}
           </div>
         </section>
+        </>
         )}
       </main>
 
