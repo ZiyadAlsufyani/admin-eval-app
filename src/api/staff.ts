@@ -31,9 +31,14 @@ export function useStaffQuery(weekStartDate?: Date) {
         }
       }
 
+      // Build a Map for O(1) lookups instead of O(n*m) .find() inside .map()
+      const evaluationsByStaffId = new Map(
+        evaluations.map((evaluation: any) => [evaluation.staff_id, evaluation] as const)
+      );
+
       // Map from Supabase Profile schema back to UI StaffMember shape
       return profiles.map((profile: any): StaffMember => {
-        const evaluation = evaluations.find(e => e.staff_id === profile.id);
+        const evaluation = evaluationsByStaffId.get(profile.id);
         const isDraft = evaluation?.status === 'draft';
         const isCompleted = evaluation?.status === 'submitted';
 

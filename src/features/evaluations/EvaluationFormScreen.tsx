@@ -24,7 +24,7 @@ export default function EvaluationFormScreen() {
   const [justifications, setJustifications] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
 
-  // Hydrate form if a draft exists
+  // Hydrate form if a draft exists, or reset if switching to a blank context
   useEffect(() => {
     if (existingEvaluation) {
       setNotes(existingEvaluation.general_notes || '');
@@ -40,6 +40,11 @@ export default function EvaluationFormScreen() {
       
       setRatings(newRatings);
       setJustifications(newJustifs);
+    } else {
+      // Reset form state to prevent stale data from a previous context
+      setRatings({});
+      setJustifications({});
+      setNotes('');
     }
   }, [existingEvaluation]);
 
@@ -102,7 +107,7 @@ export default function EvaluationFormScreen() {
     if (!payload) return;
     try {
       await saveEvaluation(payload);
-      updateStaffStatus(staff.id, { isDraft: true });
+      updateStaffStatus(staff.id, { status: 'مسودة', isDraft: true });
       navigate(-1);
     } catch (e) {
       alert('حدث خطأ أثناء حفظ المسودة');
@@ -147,7 +152,9 @@ export default function EvaluationFormScreen() {
         <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0px_12px_32px_rgba(0,0,0,0.03)] border border-surface-container space-y-3">
           <div className="flex items-center justify-between">
             <span className="bg-vertex-teal text-white px-3 py-1 rounded-full text-[10px] font-bold">نموذج التقييم الاسبوعي</span>
-            <span className="text-xs font-semibold text-secondary">الاسبوع 14</span>
+            <span className="text-xs font-semibold text-secondary">
+              {academicContext?.weekNumber ? `الأسبوع ${academicContext.weekNumber}` : 'الأسبوع الحالي'}
+            </span>
           </div>
           <div className="flex gap-4 items-center pt-2">
             <img src={staff.avatarUrl || `https://ui-avatars.com/api/?name=${staff.name}&background=random`} alt={staff.name} className="w-16 h-16 rounded-xl object-cover shadow-sm bg-surface-container" />

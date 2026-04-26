@@ -5,10 +5,12 @@ import { useStaffQuery } from '@/api/staff';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@/components/ui/icon';
 import emailjs from '@emailjs/browser';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function StaffManagementScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile, school } = useAuth();
   const { data: staffList = [], isLoading } = useStaffQuery();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -42,13 +44,8 @@ export default function StaffManagementScreen() {
     setInviteError('');
 
     try {
-      // The back-end RLS uses get_my_school_id(), but we need to insert the record natively.
-      const { data: profile, error: profileErr } = await supabase
-        .from('profiles')
-        .select('school_id, schools(name)')
-        .single();
-      
-      if (profileErr || !profile?.school_id) throw new Error('Could not identify school');
+      // Use the authenticated user's profile to get the school_id
+      if (!profile?.school_id) throw new Error('Could not identify school');
 
       const { error: insertErr } = await supabase
         .from('staff_invitations')
@@ -57,7 +54,7 @@ export default function StaffManagementScreen() {
       if (insertErr) throw insertErr;
 
       // Dispatch the physical email
-      const schoolName = (profile.schools as any)?.name || 'إدارة المدرسة';
+      const schoolName = school?.name || 'إدارة المدرسة';
       const inviteLink = `${window.location.origin}/signup/staff?email=${encodeURIComponent(inviteEmail)}`;
 
       const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;

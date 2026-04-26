@@ -5,13 +5,13 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { getTermWeeks } from '@/utils/academicCalendar';
 
 export default function PendingEvaluationsScreen() {
-  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext } = useOutletContext<StaffOutletContext>();
+  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext, currentAcademicContext } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const [isWeekPickerOpen, setIsWeekPickerOpen] = useState(false);
   
-  const recentWeeks = academicContext 
-    ? getTermWeeks(academicContext.activeTerm, academicContext.weekNumber)
-    : [];
+  const recentWeeks = currentAcademicContext 
+    ? getTermWeeks(currentAcademicContext.activeTerm, currentAcademicContext.weekNumber)
+    : (academicContext ? getTermWeeks(academicContext.activeTerm, academicContext.weekNumber) : []);
 
   // Stats calculation
   const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'مسودة').length;

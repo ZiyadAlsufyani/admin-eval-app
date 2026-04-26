@@ -15,6 +15,7 @@ export type StaffOutletContext = {
   selectedEvaluationWeek: Date;
   setSelectedEvaluationWeek: (date: Date) => void;
   academicContext: AcademicContext | null;
+  currentAcademicContext: AcademicContext | null;
 };
 
 export function MobileLayout() {
@@ -29,6 +30,7 @@ export function MobileLayout() {
   // Fetch terms and calculate academic context
   const { data: terms = [], isLoading: isTermsLoading } = useAcademicTermsQuery();
   const academicContext = getAcademicContext(selectedEvaluationWeek, terms);
+  const currentAcademicContext = getAcademicContext(new Date(), terms);
 
   // Fetch real data via TanStack + Supabase
   const { data: staffList = [], isLoading: isStaffLoading } = useStaffQuery(selectedEvaluationWeek);
@@ -80,7 +82,8 @@ export function MobileLayout() {
         updateStaffStatus, 
         selectedEvaluationWeek, 
         setSelectedEvaluationWeek,
-        academicContext
+        academicContext,
+        currentAcademicContext
       }} />
       <BottomNav
         activeId={activeTab}
