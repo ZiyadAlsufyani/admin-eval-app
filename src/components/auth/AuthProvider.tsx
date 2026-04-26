@@ -35,11 +35,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', activeUser.id)
         .single();
+        
+      if (profileError) {
+        if (profileError.code === 'PGRST116') {
+          console.warn('Profile missing from database (likely wiped). Forcing logout...');
+          await supabase.auth.signOut();
+        } else {
+          console.error('Error fetching profile:', profileError);
+        }
+        return; // Halt further loading
+      }
         
       if (profileData && profileData.school_id) {
         setProfile(profileData);

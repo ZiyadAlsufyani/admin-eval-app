@@ -41,5 +41,20 @@ export function ProtectedRoute() {
     if (profile?.role === 'staff') return <Navigate to="/staff-dashboard" replace />;
   }
 
+  // Enforce isolation between roles
+  const principalRoutes = ['/admin-dashboard', '/staff', '/tasks', '/evaluate'];
+  const staffRoutes = ['/staff-dashboard'];
+
+  const isPrincipalRoute = principalRoutes.some(route => location.pathname === route || location.pathname.startsWith(`${route}/`));
+  const isStaffRoute = staffRoutes.some(route => location.pathname === route || location.pathname.startsWith(`${route}/`));
+
+  if (profile?.role === 'staff' && isPrincipalRoute) {
+    return <Navigate to="/staff-dashboard" replace />;
+  }
+
+  if (profile?.role === 'principal' && isStaffRoute) {
+    return <Navigate to="/admin-dashboard" replace />;
+  }
+
   return <Outlet />;
 }
