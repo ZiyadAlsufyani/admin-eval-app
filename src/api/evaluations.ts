@@ -6,6 +6,7 @@ export type EvaluationDetail = {
   score: number;
   justification_notes?: string;
   evidence_file_url?: string;
+  attachments?: string[];
 };
 
 export type SaveEvaluationPayload = {
