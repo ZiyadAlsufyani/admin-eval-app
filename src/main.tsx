@@ -7,6 +7,7 @@ import { AuthProvider } from './components/auth/AuthProvider'
 import { get, set } from 'idb-keyval'
 
 // --- ANDROID OOM PRE-BOOT INTERCEPTOR ---
+// Catches file picker selections before React has mounted its event listeners.
 const globalInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
 if (globalInput) {
   globalInput.addEventListener('change', async (e) => {
@@ -17,23 +18,19 @@ if (globalInput) {
 
     if (rawFile && categoryId && idbKey) {
       try {
-        // Fetch existing IDB data
-        const existingData = (await get(idbKey)) || {};
-        const categoryFiles = existingData[categoryId] || [];
-        
-        // Append the new file
+        // Initialize or fetch the EvaluationDraft shape
+        const existingData = (await get(idbKey)) || { ratings: {}, notes: '', pendingUploads: {} };
+        // Safety: migrate old drafts that lacked the pendingUploads wrapper
+        if (!existingData.pendingUploads) existingData.pendingUploads = {};
+        const categoryFiles = existingData.pendingUploads[categoryId] || [];
         categoryFiles.push({ file: rawFile });
-        existingData[categoryId] = categoryFiles;
-        
-        // Save back to IDB
+        existingData.pendingUploads[categoryId] = categoryFiles;
         await set(idbKey, existingData);
-        
-        // Clean up localStorage
         localStorage.removeItem('pendingUploadCategory');
         localStorage.removeItem('currentUploadIdbKey');
-        target.value = ''; // Reset input
+        target.value = '';
       } catch (err) {
-        console.error("Pre-boot interceptor failed:", err);
+        console.error('Pre-boot interceptor failed:', err);
       }
     }
   });

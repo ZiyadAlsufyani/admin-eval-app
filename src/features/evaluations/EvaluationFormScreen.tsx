@@ -7,7 +7,13 @@ import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations
 import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
 import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
 import { formatISODate } from '@/utils/date';
-import { CameraCapture } from '@/components/ui/CameraCapture';
+
+// ---- Draft shape stored in IDB ----
+interface EvaluationDraft {
+  ratings: Record<string, number>;
+  notes: string;
+  pendingUploads: Record<string, { file: File }[]>;
+}
 
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
@@ -17,172 +23,117 @@ export default function EvaluationFormScreen() {
 
   const staff = staffList.find(s => s.id === staffId);
   const weekStartDateString = formatISODate(selectedEvaluationWeek);
+  const idbKey = staff ? `draft_uploads_${staff.id}_${weekStartDateString}` : null;
 
   // Queries and Mutations
   const { data: existingEvaluation, isLoading: isFetching } = useEvaluationQuery(staffId || '', weekStartDateString);
   const { mutateAsync: saveEvaluation, isPending: isSaving } = useSaveEvaluationMutation();
 
-  // --- SessionStorage persistence (survives mobile page kills) ---
-  const [activeCameraCategory, setActiveCameraCategory] = useState<string | null>(null);
-  const sessionKey = `eval_draft_${staffId}_${weekStartDateString}`;
-  const isRestoredRef = useRef(false);
-
-  const saveToSession = (state: {
-    ratings: Record<string, number>;
-    justifications: Record<string, string>;
-    attachments: Record<string, string[]>;
-    pendingDeletions: string[];
-    notes: string;
-  }) => {
-    try {
-      sessionStorage.setItem(sessionKey, JSON.stringify(state));
-    } catch { /* quota exceeded - non-critical */ }
-  };
-
-  const loadFromSession = () => {
-    try {
-      const raw = sessionStorage.getItem(sessionKey);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  };
-
-  const clearSession = () => {
-    try { sessionStorage.removeItem(sessionKey); } catch {}
-  };
-
-  // Local state to store ratings
+  // ---- Core form state ----
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [justifications, setJustifications] = useState<Record<string, string>>({});
   const [attachments, setAttachments] = useState<Record<string, string[]>>({});
-  
-  // Deferred storage state
-  const [pendingUploads, setPendingUploads] = useState<Record<string, { file: File, preview: string }[]>>({});
+  const [pendingUploads, setPendingUploads] = useState<Record<string, { file: File; preview: string }[]>>({});
   const [pendingDeletions, setPendingDeletions] = useState<string[]>([]);
-  const [isIDBLoaded, setIsIDBLoaded] = useState(false);
-  
-  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [notes, setNotes] = useState('');
-  
-  // Refs for state access inside global event listener (to recover from Android page-kill)
+  const [isUploading, setIsUploading] = useState(false);
+
+  // ---- IDB load flag — prevents the save effect running before initial hydration ----
+  const [isIDBLoaded, setIsIDBLoaded] = useState(false);
+  // Prevents the DB-hydration effect from overwriting IDB-restored state
+  const isRestoredRef = useRef(false);
+
+  // ---- Refs for access inside stable callbacks ----
   const attachmentsRef = useRef(attachments);
   const pendingUploadsRef = useRef(pendingUploads);
   const pendingDeletionsRef = useRef(pendingDeletions);
-
   useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
   useEffect(() => { pendingUploadsRef.current = pendingUploads; }, [pendingUploads]);
   useEffect(() => { pendingDeletionsRef.current = pendingDeletions; }, [pendingDeletions]);
 
-  // Hydrate form: sessionStorage (unsaved work) > existingEvaluation (DB draft) > blank
+  // ---- Phase 1: Load IDB draft on mount ----
   useEffect(() => {
-    // If we already restored from sessionStorage, never overwrite with DB data
-    if (isRestoredRef.current) return;
-
-    const saved = loadFromSession();
-
-    if (saved) {
-      // Restore from sessionStorage (mobile page-kill recovery)
-      isRestoredRef.current = true;
-      setRatings(saved.ratings || {});
-      setJustifications(saved.justifications || {});
-      setAttachments(saved.attachments || {});
-      setPendingDeletions(saved.pendingDeletions || []);
-      setNotes(saved.notes || '');
-    } else if (existingEvaluation) {
-      setNotes(existingEvaluation.general_notes || '');
-      const newRatings: Record<string, number> = {};
-      const newJustifs: Record<string, string> = {};
-      const newAttachments: Record<string, string[]> = {};
-      
-      existingEvaluation.details.forEach((detail: any) => {
-        newRatings[detail.category_name] = detail.score;
-        if (detail.justification_notes) {
-          newJustifs[detail.category_name] = detail.justification_notes;
-        }
-        if (detail.attachments && Array.isArray(detail.attachments)) {
-          newAttachments[detail.category_name] = detail.attachments;
-        }
-      });
-      
-      setRatings(newRatings);
-      setJustifications(newJustifs);
-      setAttachments(newAttachments);
-      setPendingUploads({});
-      setPendingDeletions([]);
-    } else {
-      // Truly blank: no session, no DB draft
-      setRatings({});
-      setJustifications({});
-      setAttachments({});
-      setPendingUploads({});
-      setPendingDeletions([]);
-      setNotes('');
-    }
-  }, [existingEvaluation]);
-
-  // Load IDB once on mount
-  useEffect(() => {
-    if (!staff?.id) return;
-    idbGet(`draft_uploads_${staff.id}_${weekStartDateString}`).then(draftUploads => {
-      if (draftUploads) {
-        const restoredUploads: typeof pendingUploads = {};
-        for (const [cat, items] of Object.entries(draftUploads as Record<string, { file: File }[]>)) {
+    if (!idbKey) return;
+    idbGet(idbKey).then((draft: EvaluationDraft | undefined) => {
+      if (draft) {
+        isRestoredRef.current = true;
+        setRatings(draft.ratings || {});
+        setNotes(draft.notes || '');
+        // Reconstruct File previews from stored File objects
+        const restoredUploads: Record<string, { file: File; preview: string }[]> = {};
+        for (const [cat, items] of Object.entries(draft.pendingUploads || {})) {
           restoredUploads[cat] = items.map(i => ({
             file: i.file,
-            preview: URL.createObjectURL(i.file)
+            preview: URL.createObjectURL(i.file),
           }));
         }
         setPendingUploads(restoredUploads);
       }
       setIsIDBLoaded(true);
     }).catch(err => {
-      console.error("Failed to load IDB", err);
+      console.error('IDB load failed:', err);
       setIsIDBLoaded(true);
     });
-  }, [staff?.id, weekStartDateString]);
+  }, [idbKey]);
 
-  // Save to IDB whenever pendingUploads changes (after initial load)
+  // ---- Phase 2: Hydrate from DB evaluation (only if no IDB draft) ----
   useEffect(() => {
-    if (!isIDBLoaded || !staff?.id) return;
-    
-    const keys = Object.keys(pendingUploads);
-    if (keys.length > 0) {
-      const storable: Record<string, { file: File }[]> = {};
-      for (const [cat, items] of Object.entries(pendingUploads)) {
-        storable[cat] = items.map(i => ({ file: i.file }));
-      }
-      idbSet(`draft_uploads_${staff.id}_${weekStartDateString}`, storable).catch(console.error);
+    if (isRestoredRef.current) return;
+
+    if (existingEvaluation) {
+      const newRatings: Record<string, number> = {};
+      const newJustifs: Record<string, string> = {};
+      const newAttachments: Record<string, string[]> = {};
+      existingEvaluation.details.forEach((detail: any) => {
+        newRatings[detail.category_name] = detail.score;
+        if (detail.justification_notes) newJustifs[detail.category_name] = detail.justification_notes;
+        if (detail.attachments && Array.isArray(detail.attachments)) {
+          newAttachments[detail.category_name] = detail.attachments;
+        }
+      });
+      setNotes(existingEvaluation.general_notes || '');
+      setRatings(newRatings);
+      setJustifications(newJustifs);
+      setAttachments(newAttachments);
+      setPendingUploads({});
+      setPendingDeletions([]);
+    }
+  }, [existingEvaluation]);
+
+  // ---- Phase 3: Save consolidated draft to IDB on every change ----
+  useEffect(() => {
+    if (!isIDBLoaded || !idbKey) return;
+
+    const hasDraftContent =
+      Object.keys(ratings).length > 0 ||
+      notes.length > 0 ||
+      Object.values(pendingUploads).some(arr => arr.length > 0);
+
+    if (hasDraftContent) {
+      const storable: EvaluationDraft = {
+        ratings,
+        notes,
+        pendingUploads: Object.fromEntries(
+          Object.entries(pendingUploads).map(([cat, items]) => [cat, items.map(i => ({ file: i.file }))])
+        ),
+      };
+      idbSet(idbKey, storable).catch(console.error);
     } else {
-      idbDel(`draft_uploads_${staff.id}_${weekStartDateString}`).catch(console.error);
+      idbDel(idbKey).catch(console.error);
     }
-  }, [pendingUploads, isIDBLoaded, staff?.id, weekStartDateString]);
+  }, [pendingUploads, ratings, notes, isIDBLoaded, idbKey]);
 
-  // Persist serializable form state to sessionStorage on every change
-  useEffect(() => {
-    const hasContent = Object.keys(ratings).length > 0 || notes.length > 0 || Object.keys(attachments).length > 0;
-    if (hasContent) {
-      saveToSession({ ratings, justifications, attachments, pendingDeletions, notes });
-    }
-  }, [ratings, justifications, attachments, pendingDeletions, notes]);
-
-  // Track all ObjectURLs in a ref so cleanup always sees the latest values
+  // ---- ObjectURL cleanup on unmount ----
   const previewUrlsRef = useRef<Set<string>>(new Set());
-
-  // Sync the ref whenever pendingUploads changes
   useEffect(() => {
-    const currentUrls = new Set(
-      Object.values(pendingUploads).flat().map(p => p.preview)
-    );
+    const currentUrls = new Set(Object.values(pendingUploads).flat().map(p => p.preview));
     previewUrlsRef.current = currentUrls;
   }, [pendingUploads]);
-
-  // Clean up all tracked ObjectURLs on unmount
   useEffect(() => {
-    return () => {
-      previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-    };
+    return () => { previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url)); };
   }, []);
 
-  // Protect against null staff cases (e.g. manual URL navigation to an invalid ID)
+  // ---- Guard: invalid staff ID ----
   if (!staff) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-surface">
@@ -196,7 +147,7 @@ export default function EvaluationFormScreen() {
     { id: 'attendance', label: 'الحضور والانصراف' },
     { id: 'duty', label: 'إشراف الأدوار' },
     { id: 'break', label: 'إشراف الفسحة' },
-    { id: 'supervision', label: 'المناوبة' }
+    { id: 'supervision', label: 'المناوبة' },
   ];
 
   const handleRating = (questionId: string, score: number) => {
@@ -216,14 +167,12 @@ export default function EvaluationFormScreen() {
       return Promise.resolve(file);
     }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
 
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
-
-        // Scale down to max 1920px on the longest side
         const MAX_DIM = 1920;
         let { width, height } = img;
         if (width > MAX_DIM || height > MAX_DIM) {
@@ -231,67 +180,42 @@ export default function EvaluationFormScreen() {
           width = Math.round(width * ratio);
           height = Math.round(height * ratio);
         }
-
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d')!;
-        
         try {
           ctx.drawImage(img, 0, 0, width, height);
-        } catch (err) {
-          console.error("Canvas drawImage failed", err);
+        } catch {
           resolve(file);
           return;
         }
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob && blob.size <= maxBytes) {
-              resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
-            } else {
-              // If still too large, try lower quality
-              canvas.toBlob(
-                (blob2) => {
-                  if (blob2) {
-                    resolve(new File([blob2], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
-                  } else {
-                    resolve(file); // fallback to original
-                  }
-                },
-                'image/jpeg',
-                0.6
-              );
-            }
-          },
-          'image/jpeg',
-          0.85
-        );
+        canvas.toBlob(blob => {
+          if (blob && blob.size <= maxBytes) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+          } else {
+            canvas.toBlob(blob2 => {
+              resolve(blob2
+                ? new File([blob2], file.name, { type: 'image/jpeg', lastModified: Date.now() })
+                : file);
+            }, 'image/jpeg', 0.6);
+          }
+        }, 'image/jpeg', 0.85);
       };
 
-      img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        resolve(file); // fallback to original on decode error
-      };
-
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
       img.src = objectUrl;
     });
   };
 
   const processFileForCategory = async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
-    if (!profile || !staff) {
-      cleanupCallback?.();
-      return;
-    }
+    if (!profile || !staff) { cleanupCallback?.(); return; }
 
-    // Validation: Max files per category
     const currentAttachments = attachmentsRef.current[categoryId] || [];
     const currentPending = pendingUploadsRef.current[categoryId] || [];
     const currentPendingDeletions = pendingDeletionsRef.current;
-    
-    // Calculate total: existing (minus deleted) + pending
-    const totalFiles = 
-      currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + 
+    const totalFiles =
+      currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length +
       currentPending.length;
 
     if (totalFiles >= MAX_FILES_PER_CATEGORY) {
@@ -300,40 +224,27 @@ export default function EvaluationFormScreen() {
       return;
     }
 
-    // Compress images if they exceed the limit (camera captures are often oversized)
     const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
     const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
 
-    // Validation: Max file size (after potential compression)
     if (file.size > MAX_SIZE_BYTES) {
       alert(`حجم الملف كبير جداً. الحد الأقصى هو ${MAX_FILE_SIZE_MB} ميجابايت.`);
       cleanupCallback?.();
       return;
     }
 
-    // Generate local preview
     const preview = URL.createObjectURL(file);
-    
+
     setPendingUploads(prev => {
       const existingFiles = prev[categoryId] || [];
-      
-      // Strict capacity check right before appending to avoid race conditions
-      const currentAttachments = attachmentsRef.current[categoryId] || [];
-      const currentPendingDeletions = pendingDeletionsRef.current;
-      const finalTotalFiles = 
-        currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + 
-        existingFiles.length;
-
-      if (finalTotalFiles >= MAX_FILES_PER_CATEGORY) {
-        // Schedule alert to avoid blocking React state update cycle
+      const currentAtts = attachmentsRef.current[categoryId] || [];
+      const currentDels = pendingDeletionsRef.current;
+      const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
+      if (finalTotal >= MAX_FILES_PER_CATEGORY) {
         setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
         return prev;
       }
-
-      return {
-        ...prev,
-        [categoryId]: [...existingFiles, { file, preview }]
-      };
+      return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
     });
 
     cleanupCallback?.();
@@ -343,68 +254,39 @@ export default function EvaluationFormScreen() {
     const target = e.target as HTMLInputElement;
     const rawFile = target.files?.[0];
     const categoryId = localStorage.getItem('pendingUploadCategory');
-    
-    if (!rawFile || !categoryId) {
-      target.value = ''; // cleanup just in case
-      return;
-    }
-
+    if (!rawFile || !categoryId) { target.value = ''; return; }
     await processFileForCategory(rawFile, categoryId, () => {
       target.value = '';
       localStorage.removeItem('pendingUploadCategory');
     });
   }, [profile, staff]);
 
-  const handleInAppCapture = async (file: File) => {
-    if (!activeCameraCategory) return;
-    await processFileForCategory(file, activeCameraCategory, () => {
-      setActiveCameraCategory(null);
-    });
-  };
-
-  // Hook up the global listener and check for restored files from Android Activity Kill
+  // ---- Hook up the single global file listener ----
   useEffect(() => {
     const fileInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
-    const cameraInput = document.getElementById('global-mobile-camera-input') as HTMLInputElement;
-    if (!fileInput && !cameraInput) return;
+    if (!fileInput) return;
+    fileInput.addEventListener('change', handleGlobalFileChange);
+    // Note: Pre-boot interceptor in main.tsx handles activity-kill recovery.
+    return () => { fileInput.removeEventListener('change', handleGlobalFileChange); };
+  }, [handleGlobalFileChange]);
 
-    if (fileInput) fileInput.addEventListener('change', handleGlobalFileChange);
-    if (cameraInput) cameraInput.addEventListener('change', handleGlobalFileChange);
-
-    // Note: Pre-boot interceptor handles the activity kill recovery natively now.
-
-    return () => {
-      if (fileInput) fileInput.removeEventListener('change', handleGlobalFileChange);
-      if (cameraInput) cameraInput.removeEventListener('change', handleGlobalFileChange);
-    };
-  }, [handleGlobalFileChange, profile, staff]);
-
-  const triggerFileUpload = (categoryId: string, type: 'file' | 'camera' = 'file') => {
-    if (type === 'camera') {
-      setActiveCameraCategory(categoryId);
-      return;
-    }
-    
+  const triggerFileUpload = (categoryId: string) => {
     if (staff) {
       localStorage.setItem('currentUploadIdbKey', `draft_uploads_${staff.id}_${weekStartDateString}`);
     }
     localStorage.setItem('pendingUploadCategory', categoryId);
     const globalInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
-    if (globalInput) {
-      globalInput.click();
-    }
+    globalInput?.click();
   };
 
   const handleDeleteFile = (categoryId: string, pathOrPreview: string, isPending: boolean) => {
     if (isPending) {
-      // It's a local pending file. Revoke the URL and remove from state.
       URL.revokeObjectURL(pathOrPreview);
       setPendingUploads(prev => ({
         ...prev,
-        [categoryId]: prev[categoryId].filter(p => p.preview !== pathOrPreview)
+        [categoryId]: prev[categoryId].filter(p => p.preview !== pathOrPreview),
       }));
     } else {
-      // It's an existing DB path. Queue it for deletion.
       if (!pendingDeletions.includes(pathOrPreview)) {
         setPendingDeletions(prev => [...prev, pathOrPreview]);
       }
@@ -414,17 +296,21 @@ export default function EvaluationFormScreen() {
   const buildPayload = (status: 'draft' | 'submitted', finalAttachments: Record<string, string[]>) => {
     if (!profile || !staff) return null;
 
-    const details = QUESTIONS.map(q => ({
-      category_name: q.id,
-      score: ratings[q.id] || 0,
-      justification_notes: justifications[q.id] || '',
-      attachments: finalAttachments[q.id] || [],
-    }));
+    // Skip unanswered questions — DB CHECK constraint requires score >= 1.
+    const details = QUESTIONS
+      .filter(q => !!ratings[q.id])
+      .map(q => ({
+        category_name: q.id,
+        score: ratings[q.id],
+        justification_notes: justifications[q.id] || '',
+        attachments: finalAttachments[q.id] || [],
+      }));
 
-    // Calculate percentage based on max 5 per question
     const answeredCount = QUESTIONS.filter(q => ratings[q.id]).length;
     const totalScore = QUESTIONS.reduce((sum, q) => sum + (ratings[q.id] || 0), 0);
-    const overall_score_percentage = answeredCount > 0 ? Math.round((totalScore / (QUESTIONS.length * 5)) * 100) : 0;
+    const overall_score_percentage = answeredCount > 0
+      ? Math.round((totalScore / (QUESTIONS.length * 5)) * 100)
+      : 0;
 
     return {
       school_id: profile.school_id,
@@ -443,28 +329,28 @@ export default function EvaluationFormScreen() {
 
   const handleSave = async (status: 'draft' | 'submitted') => {
     if (!profile || !staff) return;
-    
+
+    if (status === 'submitted') {
+      const unanswered = QUESTIONS.filter(q => !ratings[q.id]);
+      if (unanswered.length > 0) {
+        alert(`يرجى تقييم جميع البنود قبل الإرسال. البنود غير المكتملة: ${unanswered.map(q => q.label).join('، ')}`);
+        return;
+      }
+    }
+
     setIsUploading(true);
-    const newlyUploadedPaths: string[] = []; // Track for rollback
+    const newlyUploadedPaths: string[] = [];
     try {
-      // Step 1: Deep-clone attachments to avoid mutating React state
       const finalAttachments: Record<string, string[]> = Object.fromEntries(
         Object.entries(attachments).map(([k, v]) => [k, [...v]])
       );
 
-      // Step 2: Concurrently upload all pending files
       const uploadPromises: Promise<void>[] = [];
-
       Object.entries(pendingUploads).forEach(([categoryId, uploads]) => {
         if (!finalAttachments[categoryId]) finalAttachments[categoryId] = [];
-        
         uploads.forEach(upload => {
           const promise = uploadEvaluationEvidence(
-            upload.file,
-            profile.school_id,
-            staff.id,
-            weekStartDateString,
-            categoryId
+            upload.file, profile.school_id, staff.id, weekStartDateString, categoryId
           ).then(path => {
             newlyUploadedPaths.push(path);
             finalAttachments[categoryId] = [...finalAttachments[categoryId], path];
@@ -475,40 +361,40 @@ export default function EvaluationFormScreen() {
 
       await Promise.all(uploadPromises);
 
-      // Step 3: Remove any queued deletions from the final attachments array
       Object.keys(finalAttachments).forEach(categoryId => {
         finalAttachments[categoryId] = finalAttachments[categoryId].filter(
           path => !pendingDeletions.includes(path)
         );
       });
 
-      // Step 4: Save to DB
       const payload = buildPayload(status, finalAttachments);
       if (!payload) throw new Error('Invalid payload');
-      
       await saveEvaluation(payload);
-      
-      // Step 5: Concurrently delete from bucket only after DB is secured
+
       if (pendingDeletions.length > 0) {
-        const deletePromises = pendingDeletions.map(path => 
-          deleteEvaluationEvidence(path).catch(err => console.error('Failed to delete file:', path, err))
+        await Promise.all(
+          pendingDeletions.map(path =>
+            deleteEvaluationEvidence(path).catch(err => console.error('Delete failed:', path, err))
+          )
         );
-        await Promise.all(deletePromises);
       }
 
-      // Clear session cache on successful save
-      clearSession();
-      await idbDel(`draft_uploads_${staff.id}_${weekStartDateString}`).catch(console.error);
-      updateStaffStatus(staff.id, { status: status === 'submitted' ? 'مكتمل' : 'مسودة', isDraft: status === 'draft' });
+      // Clear entire IDB draft on success
+      if (idbKey) await idbDel(idbKey).catch(console.error);
+
+      updateStaffStatus(staff.id, {
+        status: status === 'submitted' ? 'مكتمل' : 'مسودة',
+        isDraft: status === 'draft',
+      });
       navigate(-1);
     } catch (e) {
-      // Rollback: delete any files that were uploaded before the failure
       if (newlyUploadedPaths.length > 0) {
-        console.warn('Save failed, rolling back uploaded files:', newlyUploadedPaths);
-        const rollbackPromises = newlyUploadedPaths.map(path => 
-          deleteEvaluationEvidence(path).catch(err => console.error('Rollback failed for:', path, err))
+        console.warn('Save failed, rolling back:', newlyUploadedPaths);
+        await Promise.all(
+          newlyUploadedPaths.map(path =>
+            deleteEvaluationEvidence(path).catch(err => console.error('Rollback failed:', path, err))
+          )
         );
-        await Promise.all(rollbackPromises);
       }
       alert('حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.');
     } finally {
@@ -526,7 +412,7 @@ export default function EvaluationFormScreen() {
 
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
-      
+
       {/* TopAppBar */}
       <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-none border-b border-surface-container pt-safe">
         <div className="flex items-center gap-4 w-full px-6 h-16">
@@ -538,7 +424,7 @@ export default function EvaluationFormScreen() {
       </header>
 
       <main className="max-w-md mx-auto px-4 py-6 space-y-6">
-        
+
         {/* Header Info Card */}
         <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0px_12px_32px_rgba(0,0,0,0.03)] border border-surface-container space-y-3">
           <div className="flex items-center justify-between">
@@ -556,64 +442,52 @@ export default function EvaluationFormScreen() {
           </div>
         </div>
 
-        {/* Section 1: Discipline (الانضباط) */}
+        {/* Section 1: Discipline */}
         <section className="space-y-4">
           <div className="flex items-center gap-2 px-1">
             <Icon name="ShieldCheck" size={24} className="text-vertex-teal" />
             <h3 className="text-lg font-bold">الانضباط</h3>
           </div>
-          
+
           <div className="bg-surface-container-lowest border border-surface-container rounded-xl p-4 space-y-8">
             {QUESTIONS.map((q) => (
               <div key={q.id} className="space-y-3">
                 <label className="text-sm font-bold text-secondary">{q.label}</label>
-                
+
                 {/* 5-Point Selector */}
                 <div className="grid gap-1.5 p-1.5 bg-surface-container rounded-lg grid-cols-5">
                   {[5, 4, 3, 2, 1].map(score => {
                     const isSelected = ratings[q.id] === score;
                     return (
-                      <button 
+                      <button
                         key={score}
                         onClick={() => handleRating(q.id, score)}
                         className={`text-sm py-2 rounded-md font-bold transition-colors ${
-                          isSelected 
-                            ? 'bg-vertex-teal text-white shadow-md' 
-                            : 'text-secondary hover:bg-surface/50'
+                          isSelected ? 'bg-vertex-teal text-white shadow-md' : 'text-secondary hover:bg-surface/50'
                         }`}
                       >
                         {score}
                       </button>
-                    )
+                    );
                   })}
                 </div>
 
-                {/* Optional Justification */}
+                {/* Optional Justification + Paperclip */}
                 <div className="flex gap-2 items-start mt-2">
-                  <textarea 
+                  <textarea
                     value={justifications[q.id] || ''}
                     onChange={(e) => handleJustification(q.id, e.target.value)}
-                    className="flex-1 text-[11px] p-2.5 bg-surface-container border-none rounded-lg focus:ring-2 focus:ring-vertex-teal min-h-[60px] resize-none" 
+                    className="flex-1 text-[11px] p-2.5 bg-surface-container border-none rounded-lg focus:ring-2 focus:ring-vertex-teal min-h-[60px] resize-none"
                     placeholder="أضف مبررات التقييم..."
                   />
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => triggerFileUpload(q.id, 'camera')}
-                      aria-label="التقاط صورة"
-                      className={`p-2.5 bg-surface-container rounded-lg text-secondary hover:text-vertex-teal transition-colors cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      <Icon name="Camera" size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => triggerFileUpload(q.id, 'file')}
-                      aria-label="إرفاق ملف"
-                      className={`p-2.5 bg-surface-container rounded-lg text-secondary hover:text-vertex-teal transition-colors cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      <Icon name="Paperclip" size={18} />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => triggerFileUpload(q.id)}
+                    aria-label="إرفاق ملف أو صورة"
+                    className={`p-2.5 bg-surface-container rounded-lg text-secondary hover:text-vertex-teal transition-colors cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    <Icon name="Paperclip" size={18} />
+                  </button>
                 </div>
 
                 {/* Attachments Preview */}
@@ -625,7 +499,6 @@ export default function EvaluationFormScreen() {
                       const fileName = path.split('/').pop() || 'ملف مرفق';
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
                       const url = getEvidenceUrl(path);
-                      
                       return (
                         <div key={path} className="flex items-center gap-3 p-2 rounded-lg bg-surface-container border border-surface-container-high">
                           {isImage ? (
@@ -636,7 +509,7 @@ export default function EvaluationFormScreen() {
                             </div>
                           )}
                           <span className="flex-1 text-xs text-secondary truncate" dir="ltr">{fileName.replace(/^\d+_/, '')}</span>
-                          <button 
+                          <button
                             onClick={() => handleDeleteFile(q.id, path, false)}
                             disabled={isUploading}
                             className="p-1.5 rounded-full text-red-500 hover:bg-red-500/10 transition-colors shrink-0 disabled:opacity-50"
@@ -645,13 +518,12 @@ export default function EvaluationFormScreen() {
                           </button>
                         </div>
                       );
-                  })}
-                  
+                    })}
+
                   {/* Pending Local Uploads */}
-                  {(pendingUploads[q.id] || []).map((upload) => {
+                  {(pendingUploads[q.id] || []).map(upload => {
                     const fileName = upload.file.name;
                     const isImage = upload.file.type.startsWith('image/');
-                    
                     return (
                       <div key={upload.preview} className="flex items-center gap-3 p-2 rounded-lg bg-surface-container border border-vertex-teal/30">
                         {isImage ? (
@@ -662,7 +534,7 @@ export default function EvaluationFormScreen() {
                           </div>
                         )}
                         <span className="flex-1 text-xs text-secondary truncate" dir="ltr">{fileName}</span>
-                        <button 
+                        <button
                           onClick={() => handleDeleteFile(q.id, upload.preview, true)}
                           disabled={isUploading}
                           className="p-1.5 rounded-full text-red-500 hover:bg-red-500/10 transition-colors shrink-0 disabled:opacity-50"
@@ -685,11 +557,11 @@ export default function EvaluationFormScreen() {
             <h3 className="text-lg font-bold">ملاحظات المدير/ة</h3>
           </div>
           <div className="bg-surface-container-lowest border border-surface-container rounded-xl p-1 shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-vertex-teal transition-all">
-            <textarea 
+            <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full min-h-[120px] p-4 bg-transparent border-none focus:ring-0 text-sm resize-none" 
-              placeholder="أدخل ملاحظات التقييم النوعي هنا..." 
+              className="w-full min-h-[120px] p-4 bg-transparent border-none focus:ring-0 text-sm resize-none"
+              placeholder="أدخل ملاحظات التقييم النوعي هنا..."
             />
             <div className="px-4 py-2 border-t border-surface-container flex justify-end">
               <span className="text-[10px] text-secondary">الحد الأقصى 500 كلمة</span>
@@ -699,7 +571,7 @@ export default function EvaluationFormScreen() {
 
         {/* Footer Actions */}
         <div className="pt-4 flex flex-col gap-3">
-          <button 
+          <button
             onClick={() => handleSave('submitted')}
             disabled={isSaving || isUploading}
             className="w-full py-4 flex items-center justify-center gap-2 bg-vertex-teal text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50"
@@ -708,7 +580,7 @@ export default function EvaluationFormScreen() {
               <><Icon name="Loader2" size={20} className="animate-spin" /> جاري الإرسال...</>
             ) : 'إرسال التقييم'}
           </button>
-          <button 
+          <button
             onClick={() => handleSave('draft')}
             disabled={isSaving || isUploading}
             className="w-full py-4 flex items-center justify-center gap-2 bg-surface-container text-foreground font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50"
@@ -719,14 +591,6 @@ export default function EvaluationFormScreen() {
           </button>
         </div>
       </main>
-
-      {/* Full-screen in-app camera viewfinder overlay */}
-      {activeCameraCategory && (
-        <CameraCapture 
-          onCapture={handleInAppCapture} 
-          onCancel={() => setActiveCameraCategory(null)} 
-        />
-      )}
     </div>
   );
 }
