@@ -5,6 +5,7 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
 import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
+import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
 import { formatISODate } from '@/utils/date';
 import { CameraCapture } from '@/components/ui/CameraCapture';
 
@@ -57,6 +58,7 @@ export default function EvaluationFormScreen() {
   // Deferred storage state
   const [pendingUploads, setPendingUploads] = useState<Record<string, { file: File, preview: string }[]>>({});
   const [pendingDeletions, setPendingDeletions] = useState<string[]>([]);
+  const [isIDBLoaded, setIsIDBLoaded] = useState(false);
   
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [notes, setNotes] = useState('');
@@ -85,7 +87,6 @@ export default function EvaluationFormScreen() {
       setAttachments(saved.attachments || {});
       setPendingDeletions(saved.pendingDeletions || []);
       setNotes(saved.notes || '');
-      setPendingUploads({});
     } else if (existingEvaluation) {
       setNotes(existingEvaluation.general_notes || '');
       const newRatings: Record<string, number> = {};
@@ -117,6 +118,43 @@ export default function EvaluationFormScreen() {
       setNotes('');
     }
   }, [existingEvaluation]);
+
+  // Load IDB once on mount
+  useEffect(() => {
+    if (!staff?.id) return;
+    idbGet(`draft_uploads_${staff.id}_${weekStartDateString}`).then(draftUploads => {
+      if (draftUploads) {
+        const restoredUploads: typeof pendingUploads = {};
+        for (const [cat, items] of Object.entries(draftUploads as Record<string, { file: File }[]>)) {
+          restoredUploads[cat] = items.map(i => ({
+            file: i.file,
+            preview: URL.createObjectURL(i.file)
+          }));
+        }
+        setPendingUploads(restoredUploads);
+      }
+      setIsIDBLoaded(true);
+    }).catch(err => {
+      console.error("Failed to load IDB", err);
+      setIsIDBLoaded(true);
+    });
+  }, [staff?.id, weekStartDateString]);
+
+  // Save to IDB whenever pendingUploads changes (after initial load)
+  useEffect(() => {
+    if (!isIDBLoaded || !staff?.id) return;
+    
+    const keys = Object.keys(pendingUploads);
+    if (keys.length > 0) {
+      const storable: Record<string, { file: File }[]> = {};
+      for (const [cat, items] of Object.entries(pendingUploads)) {
+        storable[cat] = items.map(i => ({ file: i.file }));
+      }
+      idbSet(`draft_uploads_${staff.id}_${weekStartDateString}`, storable).catch(console.error);
+    } else {
+      idbDel(`draft_uploads_${staff.id}_${weekStartDateString}`).catch(console.error);
+    }
+  }, [pendingUploads, isIDBLoaded, staff?.id, weekStartDateString]);
 
   // Persist serializable form state to sessionStorage on every change
   useEffect(() => {
@@ -304,7 +342,7 @@ export default function EvaluationFormScreen() {
   const handleGlobalFileChange = useCallback(async (e: Event | { target: HTMLInputElement }) => {
     const target = e.target as HTMLInputElement;
     const rawFile = target.files?.[0];
-    const categoryId = sessionStorage.getItem('pendingUploadCategory');
+    const categoryId = localStorage.getItem('pendingUploadCategory');
     
     if (!rawFile || !categoryId) {
       target.value = ''; // cleanup just in case
@@ -313,7 +351,7 @@ export default function EvaluationFormScreen() {
 
     await processFileForCategory(rawFile, categoryId, () => {
       target.value = '';
-      sessionStorage.removeItem('pendingUploadCategory');
+      localStorage.removeItem('pendingUploadCategory');
     });
   }, [profile, staff]);
 
@@ -333,18 +371,13 @@ export default function EvaluationFormScreen() {
     if (fileInput) fileInput.addEventListener('change', handleGlobalFileChange);
     if (cameraInput) cameraInput.addEventListener('change', handleGlobalFileChange);
 
-    // CRITICAL: Recover file if the OS killed the page and Chrome restored the input value!
-    if (fileInput?.files && fileInput.files.length > 0) {
-      handleGlobalFileChange({ target: fileInput });
-    } else if (cameraInput?.files && cameraInput.files.length > 0) {
-      handleGlobalFileChange({ target: cameraInput });
-    }
+    // Note: Pre-boot interceptor handles the activity kill recovery natively now.
 
     return () => {
       if (fileInput) fileInput.removeEventListener('change', handleGlobalFileChange);
       if (cameraInput) cameraInput.removeEventListener('change', handleGlobalFileChange);
     };
-  }, [handleGlobalFileChange]);
+  }, [handleGlobalFileChange, profile, staff]);
 
   const triggerFileUpload = (categoryId: string, type: 'file' | 'camera' = 'file') => {
     if (type === 'camera') {
@@ -352,7 +385,10 @@ export default function EvaluationFormScreen() {
       return;
     }
     
-    sessionStorage.setItem('pendingUploadCategory', categoryId);
+    if (staff) {
+      localStorage.setItem('currentUploadIdbKey', `draft_uploads_${staff.id}_${weekStartDateString}`);
+    }
+    localStorage.setItem('pendingUploadCategory', categoryId);
     const globalInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
     if (globalInput) {
       globalInput.click();
@@ -462,6 +498,7 @@ export default function EvaluationFormScreen() {
 
       // Clear session cache on successful save
       clearSession();
+      await idbDel(`draft_uploads_${staff.id}_${weekStartDateString}`).catch(console.error);
       updateStaffStatus(staff.id, { status: status === 'submitted' ? 'مكتمل' : 'مسودة', isDraft: status === 'draft' });
       navigate(-1);
     } catch (e) {
