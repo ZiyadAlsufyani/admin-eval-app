@@ -69,12 +69,21 @@ export default function EvaluationFormScreen() {
     }
   }, [existingEvaluation]);
 
-  // Clean up ObjectURLs on unmount
+  // Track all ObjectURLs in a ref so cleanup always sees the latest values
+  const previewUrlsRef = useRef<Set<string>>(new Set());
+
+  // Sync the ref whenever pendingUploads changes
+  useEffect(() => {
+    const currentUrls = new Set(
+      Object.values(pendingUploads).flat().map(p => p.preview)
+    );
+    previewUrlsRef.current = currentUrls;
+  }, [pendingUploads]);
+
+  // Clean up all tracked ObjectURLs on unmount
   useEffect(() => {
     return () => {
-      Object.values(pendingUploads).flat().forEach(p => {
-        URL.revokeObjectURL(p.preview);
-      });
+      previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -201,13 +210,18 @@ export default function EvaluationFormScreen() {
     if (!profile || !staff) return;
     
     setIsUploading(true);
+    const newlyUploadedPaths: string[] = []; // Track for rollback
     try {
-      // Step 1: Concurrently upload all pending files
-      const newAttachments: Record<string, string[]> = { ...attachments };
+      // Step 1: Deep-clone attachments to avoid mutating React state
+      const finalAttachments: Record<string, string[]> = Object.fromEntries(
+        Object.entries(attachments).map(([k, v]) => [k, [...v]])
+      );
+
+      // Step 2: Concurrently upload all pending files
       const uploadPromises: Promise<void>[] = [];
 
       Object.entries(pendingUploads).forEach(([categoryId, uploads]) => {
-        if (!newAttachments[categoryId]) newAttachments[categoryId] = [];
+        if (!finalAttachments[categoryId]) finalAttachments[categoryId] = [];
         
         uploads.forEach(upload => {
           const promise = uploadEvaluationEvidence(
@@ -217,7 +231,8 @@ export default function EvaluationFormScreen() {
             weekStartDateString,
             categoryId
           ).then(path => {
-            newAttachments[categoryId].push(path);
+            newlyUploadedPaths.push(path);
+            finalAttachments[categoryId] = [...finalAttachments[categoryId], path];
           });
           uploadPromises.push(promise);
         });
@@ -225,28 +240,38 @@ export default function EvaluationFormScreen() {
 
       await Promise.all(uploadPromises);
 
-      // Step 2: Remove any queued deletions from the final attachments array
-      Object.keys(newAttachments).forEach(categoryId => {
-        newAttachments[categoryId] = newAttachments[categoryId].filter(
+      // Step 3: Remove any queued deletions from the final attachments array
+      Object.keys(finalAttachments).forEach(categoryId => {
+        finalAttachments[categoryId] = finalAttachments[categoryId].filter(
           path => !pendingDeletions.includes(path)
         );
       });
 
-      // Step 3: Save to DB
-      const payload = buildPayload(status, newAttachments);
+      // Step 4: Save to DB
+      const payload = buildPayload(status, finalAttachments);
       if (!payload) throw new Error('Invalid payload');
       
       await saveEvaluation(payload);
       
-      // Step 4: Concurrently delete from bucket after DB is secured
+      // Step 5: Concurrently delete from bucket only after DB is secured
       if (pendingDeletions.length > 0) {
-        const deletePromises = pendingDeletions.map(path => deleteEvaluationEvidence(path).catch(err => console.error('Failed to delete file:', path, err)));
+        const deletePromises = pendingDeletions.map(path => 
+          deleteEvaluationEvidence(path).catch(err => console.error('Failed to delete file:', path, err))
+        );
         await Promise.all(deletePromises);
       }
 
       updateStaffStatus(staff.id, { status: status === 'submitted' ? 'مكتمل' : 'مسودة', isDraft: status === 'draft' });
       navigate(-1);
     } catch (e) {
+      // Rollback: delete any files that were uploaded before the failure
+      if (newlyUploadedPaths.length > 0) {
+        console.warn('Save failed, rolling back uploaded files:', newlyUploadedPaths);
+        const rollbackPromises = newlyUploadedPaths.map(path => 
+          deleteEvaluationEvidence(path).catch(err => console.error('Rollback failed for:', path, err))
+        );
+        await Promise.all(rollbackPromises);
+      }
       alert('حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.');
     } finally {
       setIsUploading(false);

@@ -20,7 +20,8 @@ export async function uploadEvaluationEvidence(
   weekStartDate: string,
   categoryId: string
 ): Promise<string> {
-  const fileExt = file.name.split('.').pop();
+  const nameParts = file.name.split('.');
+  const fileExt = nameParts.length > 1 ? nameParts.pop() : (file.type.split('/')[1] || 'bin');
   const safeWeekDate = weekStartDate.replace(/[^a-zA-Z0-9-]/g, '');
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
   

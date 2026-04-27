@@ -33,7 +33,9 @@ export function getSundayAnchor(date: Date): Date {
 
 /**
  * Engine to determine the active term and week number based on a given date.
- * Returns null if the date falls outside of any active term (holiday/break).
+ * Returns null only if the date falls outside of all academic terms.
+ * If the date is within a term but during a holiday/break week, returns an
+ * AcademicContext with `isHoliday` set to true.
  */
 export function getAcademicContext(currentDate: Date, terms: AcademicTerm[], holidays: Holiday[] = []): AcademicContext | null {
   // Reset time part for accurate date comparison
