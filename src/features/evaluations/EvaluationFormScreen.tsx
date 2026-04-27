@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
@@ -6,6 +6,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
 import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
 import { formatISODate } from '@/utils/date';
+import { CameraCapture } from '@/components/ui/CameraCapture';
 
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
@@ -20,6 +21,34 @@ export default function EvaluationFormScreen() {
   const { data: existingEvaluation, isLoading: isFetching } = useEvaluationQuery(staffId || '', weekStartDateString);
   const { mutateAsync: saveEvaluation, isPending: isSaving } = useSaveEvaluationMutation();
 
+  // --- SessionStorage persistence (survives mobile page kills) ---
+  const [activeCameraCategory, setActiveCameraCategory] = useState<string | null>(null);
+  const sessionKey = `eval_draft_${staffId}_${weekStartDateString}`;
+  const isRestoredRef = useRef(false);
+
+  const saveToSession = (state: {
+    ratings: Record<string, number>;
+    justifications: Record<string, string>;
+    attachments: Record<string, string[]>;
+    pendingDeletions: string[];
+    notes: string;
+  }) => {
+    try {
+      sessionStorage.setItem(sessionKey, JSON.stringify(state));
+    } catch { /* quota exceeded - non-critical */ }
+  };
+
+  const loadFromSession = () => {
+    try {
+      const raw = sessionStorage.getItem(sessionKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  };
+
+  const clearSession = () => {
+    try { sessionStorage.removeItem(sessionKey); } catch {}
+  };
+
   // Local state to store ratings
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [justifications, setJustifications] = useState<Record<string, string>>({});
@@ -32,12 +61,32 @@ export default function EvaluationFormScreen() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [notes, setNotes] = useState('');
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeUploadCategory, setActiveUploadCategory] = useState<string | null>(null);
+  // Refs for state access inside global event listener (to recover from Android page-kill)
+  const attachmentsRef = useRef(attachments);
+  const pendingUploadsRef = useRef(pendingUploads);
+  const pendingDeletionsRef = useRef(pendingDeletions);
 
-  // Hydrate form if a draft exists, or reset if switching to a blank context
+  useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
+  useEffect(() => { pendingUploadsRef.current = pendingUploads; }, [pendingUploads]);
+  useEffect(() => { pendingDeletionsRef.current = pendingDeletions; }, [pendingDeletions]);
+
+  // Hydrate form: sessionStorage (unsaved work) > existingEvaluation (DB draft) > blank
   useEffect(() => {
-    if (existingEvaluation) {
+    // If we already restored from sessionStorage, never overwrite with DB data
+    if (isRestoredRef.current) return;
+
+    const saved = loadFromSession();
+
+    if (saved) {
+      // Restore from sessionStorage (mobile page-kill recovery)
+      isRestoredRef.current = true;
+      setRatings(saved.ratings || {});
+      setJustifications(saved.justifications || {});
+      setAttachments(saved.attachments || {});
+      setPendingDeletions(saved.pendingDeletions || []);
+      setNotes(saved.notes || '');
+      setPendingUploads({});
+    } else if (existingEvaluation) {
       setNotes(existingEvaluation.general_notes || '');
       const newRatings: Record<string, number> = {};
       const newJustifs: Record<string, string> = {};
@@ -59,7 +108,7 @@ export default function EvaluationFormScreen() {
       setPendingUploads({});
       setPendingDeletions([]);
     } else {
-      // Reset form state to prevent stale data from a previous context
+      // Truly blank: no session, no DB draft
       setRatings({});
       setJustifications({});
       setAttachments({});
@@ -68,6 +117,14 @@ export default function EvaluationFormScreen() {
       setNotes('');
     }
   }, [existingEvaluation]);
+
+  // Persist serializable form state to sessionStorage on every change
+  useEffect(() => {
+    const hasContent = Object.keys(ratings).length > 0 || notes.length > 0 || Object.keys(attachments).length > 0;
+    if (hasContent) {
+      saveToSession({ ratings, justifications, attachments, pendingDeletions, notes });
+    }
+  }, [ratings, justifications, attachments, pendingDeletions, notes]);
 
   // Track all ObjectURLs in a ref so cleanup always sees the latest values
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -112,52 +169,194 @@ export default function EvaluationFormScreen() {
     setJustifications(prev => ({ ...prev, [questionId]: text }));
   };
 
-  const triggerFileUpload = (categoryId: string) => {
-    setActiveUploadCategory(categoryId);
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+  /**
+   * Compresses an image file via canvas to fit within the size limit.
+   * Non-image files are returned as-is.
+   */
+  const compressImageIfNeeded = (file: File, maxBytes: number): Promise<File> => {
+    if (!file.type.startsWith('image/') || file.size <= maxBytes) {
+      return Promise.resolve(file);
     }
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+
+        // Scale down to max 1920px on the longest side
+        const MAX_DIM = 1920;
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        
+        try {
+          ctx.drawImage(img, 0, 0, width, height);
+        } catch (err) {
+          console.error("Canvas drawImage failed", err);
+          resolve(file);
+          return;
+        }
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size <= maxBytes) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+            } else {
+              // If still too large, try lower quality
+              canvas.toBlob(
+                (blob2) => {
+                  if (blob2) {
+                    resolve(new File([blob2], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                  } else {
+                    resolve(file); // fallback to original
+                  }
+                },
+                'image/jpeg',
+                0.6
+              );
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file); // fallback to original on decode error
+      };
+
+      img.src = objectUrl;
+    });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeUploadCategory || !profile || !staff) return;
+  const processFileForCategory = async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
+    if (!profile || !staff) {
+      cleanupCallback?.();
+      return;
+    }
 
     // Validation: Max files per category
-    const currentAttachments = attachments[activeUploadCategory] || [];
-    const currentPending = pendingUploads[activeUploadCategory] || [];
+    const currentAttachments = attachmentsRef.current[categoryId] || [];
+    const currentPending = pendingUploadsRef.current[categoryId] || [];
+    const currentPendingDeletions = pendingDeletionsRef.current;
     
     // Calculate total: existing (minus deleted) + pending
     const totalFiles = 
-      currentAttachments.filter(path => !pendingDeletions.includes(path)).length + 
+      currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + 
       currentPending.length;
 
     if (totalFiles >= MAX_FILES_PER_CATEGORY) {
       alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
-      setActiveUploadCategory(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      cleanupCallback?.();
       return;
     }
 
-    // Validation: Max file size
+    // Compress images if they exceed the limit (camera captures are often oversized)
     const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
+
+    // Validation: Max file size (after potential compression)
     if (file.size > MAX_SIZE_BYTES) {
       alert(`حجم الملف كبير جداً. الحد الأقصى هو ${MAX_FILE_SIZE_MB} ميجابايت.`);
-      setActiveUploadCategory(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      cleanupCallback?.();
       return;
     }
 
     // Generate local preview
     const preview = URL.createObjectURL(file);
     
-    setPendingUploads(prev => ({
-      ...prev,
-      [activeUploadCategory]: [...(prev[activeUploadCategory] || []), { file, preview }]
-    }));
+    setPendingUploads(prev => {
+      const existingFiles = prev[categoryId] || [];
+      
+      // Strict capacity check right before appending to avoid race conditions
+      const currentAttachments = attachmentsRef.current[categoryId] || [];
+      const currentPendingDeletions = pendingDeletionsRef.current;
+      const finalTotalFiles = 
+        currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + 
+        existingFiles.length;
 
-    setActiveUploadCategory(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      if (finalTotalFiles >= MAX_FILES_PER_CATEGORY) {
+        // Schedule alert to avoid blocking React state update cycle
+        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [categoryId]: [...existingFiles, { file, preview }]
+      };
+    });
+
+    cleanupCallback?.();
+  };
+
+  const handleGlobalFileChange = useCallback(async (e: Event | { target: HTMLInputElement }) => {
+    const target = e.target as HTMLInputElement;
+    const rawFile = target.files?.[0];
+    const categoryId = sessionStorage.getItem('pendingUploadCategory');
+    
+    if (!rawFile || !categoryId) {
+      target.value = ''; // cleanup just in case
+      return;
+    }
+
+    await processFileForCategory(rawFile, categoryId, () => {
+      target.value = '';
+      sessionStorage.removeItem('pendingUploadCategory');
+    });
+  }, [profile, staff]);
+
+  const handleInAppCapture = async (file: File) => {
+    if (!activeCameraCategory) return;
+    await processFileForCategory(file, activeCameraCategory, () => {
+      setActiveCameraCategory(null);
+    });
+  };
+
+  // Hook up the global listener and check for restored files from Android Activity Kill
+  useEffect(() => {
+    const fileInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
+    const cameraInput = document.getElementById('global-mobile-camera-input') as HTMLInputElement;
+    if (!fileInput && !cameraInput) return;
+
+    if (fileInput) fileInput.addEventListener('change', handleGlobalFileChange);
+    if (cameraInput) cameraInput.addEventListener('change', handleGlobalFileChange);
+
+    // CRITICAL: Recover file if the OS killed the page and Chrome restored the input value!
+    if (fileInput?.files && fileInput.files.length > 0) {
+      handleGlobalFileChange({ target: fileInput });
+    } else if (cameraInput?.files && cameraInput.files.length > 0) {
+      handleGlobalFileChange({ target: cameraInput });
+    }
+
+    return () => {
+      if (fileInput) fileInput.removeEventListener('change', handleGlobalFileChange);
+      if (cameraInput) cameraInput.removeEventListener('change', handleGlobalFileChange);
+    };
+  }, [handleGlobalFileChange]);
+
+  const triggerFileUpload = (categoryId: string, type: 'file' | 'camera' = 'file') => {
+    if (type === 'camera') {
+      setActiveCameraCategory(categoryId);
+      return;
+    }
+    
+    sessionStorage.setItem('pendingUploadCategory', categoryId);
+    const globalInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
+    if (globalInput) {
+      globalInput.click();
+    }
   };
 
   const handleDeleteFile = (categoryId: string, pathOrPreview: string, isPending: boolean) => {
@@ -261,6 +460,8 @@ export default function EvaluationFormScreen() {
         await Promise.all(deletePromises);
       }
 
+      // Clear session cache on successful save
+      clearSession();
       updateStaffStatus(staff.id, { status: status === 'submitted' ? 'مكتمل' : 'مسودة', isDraft: status === 'draft' });
       navigate(-1);
     } catch (e) {
@@ -288,14 +489,6 @@ export default function EvaluationFormScreen() {
 
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
-      {/* Hidden file input for handling generic uploads */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        className="hidden" 
-        accept="image/*,.pdf,.doc,.docx"
-      />
       
       {/* TopAppBar */}
       <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-none border-b border-surface-container pt-safe">
@@ -366,14 +559,24 @@ export default function EvaluationFormScreen() {
                     className="flex-1 text-[11px] p-2.5 bg-surface-container border-none rounded-lg focus:ring-2 focus:ring-vertex-teal min-h-[60px] resize-none" 
                     placeholder="أضف مبررات التقييم..."
                   />
-                  <button 
-                    onClick={() => triggerFileUpload(q.id)}
-                    disabled={isUploading}
-                    aria-label="إرفاق ملف" 
-                    className="p-2.5 bg-surface-container rounded-lg text-secondary hover:text-vertex-teal transition-colors disabled:opacity-50"
-                  >
-                    <Icon name="Paperclip" size={18} />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => triggerFileUpload(q.id, 'camera')}
+                      aria-label="التقاط صورة"
+                      className={`p-2.5 bg-surface-container rounded-lg text-secondary hover:text-vertex-teal transition-colors cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <Icon name="Camera" size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerFileUpload(q.id, 'file')}
+                      aria-label="إرفاق ملف"
+                      className={`p-2.5 bg-surface-container rounded-lg text-secondary hover:text-vertex-teal transition-colors cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <Icon name="Paperclip" size={18} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Attachments Preview */}
@@ -410,7 +613,7 @@ export default function EvaluationFormScreen() {
                   {/* Pending Local Uploads */}
                   {(pendingUploads[q.id] || []).map((upload) => {
                     const fileName = upload.file.name;
-                    const isImage = fileInputRef.current?.accept.includes('image') && upload.file.type.startsWith('image/');
+                    const isImage = upload.file.type.startsWith('image/');
                     
                     return (
                       <div key={upload.preview} className="flex items-center gap-3 p-2 rounded-lg bg-surface-container border border-vertex-teal/30">
@@ -479,6 +682,14 @@ export default function EvaluationFormScreen() {
           </button>
         </div>
       </main>
+
+      {/* Full-screen in-app camera viewfinder overlay */}
+      {activeCameraCategory && (
+        <CameraCapture 
+          onCapture={handleInAppCapture} 
+          onCancel={() => setActiveCameraCategory(null)} 
+        />
+      )}
     </div>
   );
 }
