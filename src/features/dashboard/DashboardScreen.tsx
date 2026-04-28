@@ -59,7 +59,7 @@ export default function DashboardScreen() {
         {/* Urgent Actions Hero Section */}
         <section className="space-y-3">
           <div className="flex justify-between items-center">
-            <h2 className="text-sm font-extrabold text-foreground">إجراءات عاجلة 2</h2>
+            <h2 className="text-sm font-extrabold text-foreground">إجراءات عاجلة</h2>
           </div>
           <div className="bg-vertex-teal text-white p-6 rounded-xl shadow-lg flex justify-between items-center relative overflow-hidden">
             <div className="z-10">
