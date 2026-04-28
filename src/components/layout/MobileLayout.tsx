@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { getStartOfWeek, formatISODate } from '@/utils/date';
 import { useAcademicTermsQuery, useHolidaysQuery } from '@/api/academic';
 import { getAcademicContext, type AcademicContext, type Holiday } from '@/utils/academicCalendar';
+import { PwaUpdateToast } from '@/components/ui/PwaUpdateToast';
 
 export type StaffOutletContext = {
   staffList: StaffMember[];
@@ -94,6 +95,7 @@ export function MobileLayout() {
         onNavigate={handleNavigation}
         items={navItems}
       />
+      <PwaUpdateToast />
     </div>
   );
 }
