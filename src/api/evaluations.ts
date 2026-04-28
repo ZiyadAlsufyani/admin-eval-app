@@ -122,3 +122,26 @@ export function useCumulativePerformanceQuery(schoolId: string | undefined, acad
     enabled: !!schoolId && !!academicYear,
   });
 }
+
+export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, academicYear: string | undefined) {
+  return useQuery({
+    queryKey: ['evaluations_history', staffId, academicYear],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('discipline_evaluations')
+        .select('*')
+        .eq('staff_id', staffId)
+        .eq('academic_year', academicYear)
+        .eq('status', 'submitted')
+        .order('week_start_date', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching historical evaluations:", error);
+        throw error;
+      }
+
+      return data || [];
+    },
+    enabled: !!staffId && !!academicYear,
+  });
+}

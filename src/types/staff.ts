@@ -9,6 +9,7 @@ export type StaffMember = {
   name: string;
   role: string;
   avatarUrl?: string;
+  created_at?: string;
   subject?: string; // Evaluated subject (e.g. الرياضيات)
   dueDate?: string; // Date string for evaluations
   status?: 'اليوم' | 'متأخر' | 'معلق' | 'مكتمل' | 'مسودة'; // Task deadline state

@@ -47,6 +47,7 @@ export function useStaffQuery(weekStartDate?: Date) {
           name: profile.full_name,
           role: profile.job_title || 'الاداري/ة',
           avatarUrl: profile.avatar_url,
+          created_at: profile.created_at,
           subject: profile.job_title,
           dueDate: 'الخميس، 04:00 م',
           status: isCompleted ? 'مكتمل' : isDraft ? 'مسودة' : 'معلق',
