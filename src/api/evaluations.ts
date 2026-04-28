@@ -122,3 +122,65 @@ export function useCumulativePerformanceQuery(schoolId: string | undefined, acad
     enabled: !!schoolId && !!academicYear,
   });
 }
+
+export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, academicYear: string | undefined) {
+  return useQuery({
+    queryKey: ['evaluations_history', staffId, academicYear],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('discipline_evaluations')
+        .select('*')
+        .eq('staff_id', staffId)
+        .eq('academic_year', academicYear)
+        .eq('status', 'submitted')
+        .order('week_start_date', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching historical evaluations:", error);
+        throw error;
+      }
+
+      return data || [];
+    },
+    enabled: !!staffId && !!academicYear,
+  });
+}
+
+export function useEvaluationDetailQuery(evaluationId: string | undefined) {
+  return useQuery({
+    queryKey: ['evaluation_detail', evaluationId],
+    queryFn: async () => {
+      // 1. Fetch main evaluation record
+      const { data: evalData, error: evalError } = await supabase
+        .from('discipline_evaluations')
+        .select('*')
+        .eq('id', evaluationId)
+        .maybeSingle();
+
+      if (evalError) throw evalError;
+      if (!evalData) return null;
+
+      // 2. Fetch details (sub-scores)
+      const { data: detailsData, error: detailsError } = await supabase
+        .from('discipline_evaluation_details')
+        .select('*')
+        .eq('evaluation_id', evaluationId);
+
+      if (detailsError) throw detailsError;
+
+      // 3. Fetch staff info to display name/role if needed, though profile is usually separate
+      const { data: staffData } = await supabase
+        .from('profiles')
+        .select('full_name, job_title, avatar_url')
+        .eq('id', evalData.staff_id)
+        .maybeSingle();
+
+      return {
+        ...evalData,
+        staff: staffData || null,
+        details: detailsData || [],
+      };
+    },
+    enabled: !!evaluationId,
+  });
+}

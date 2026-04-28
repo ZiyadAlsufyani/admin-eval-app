@@ -25,7 +25,15 @@ export function MobileLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const [selectedEvaluationWeek, setSelectedEvaluationWeek] = useState<Date>(getStartOfWeek());
+  const [selectedEvaluationWeek, setSelectedEvaluationWeekState] = useState<Date>(() => {
+    const saved = localStorage.getItem('selectedEvaluationWeek');
+    return saved ? new Date(saved) : getStartOfWeek();
+  });
+  
+  const setSelectedEvaluationWeek = (date: Date) => {
+    localStorage.setItem('selectedEvaluationWeek', date.toISOString());
+    setSelectedEvaluationWeekState(date);
+  };
   
   const isPrincipal = profile?.role === 'principal';
   
