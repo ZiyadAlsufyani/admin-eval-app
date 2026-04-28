@@ -6,6 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@/components/ui/icon';
 import emailjs from '@emailjs/browser';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { Avatar } from '@/components/ui/Avatar';
 
 export default function StaffManagementScreen() {
   const navigate = useNavigate();
@@ -94,21 +96,13 @@ export default function StaffManagementScreen() {
   return (
     <div className="flex flex-col min-h-screen bg-background pb-24" dir="rtl">
       {/* Header */}
-      <header className="bg-surface px-6 pt-12 pb-6 sticky top-0 z-10 shadow-sm border-b border-outline-variant/20 flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold font-headline text-on-surface transform tracking-tight">الاداريين</h1>
-          <p className="text-sm text-secondary font-medium mt-1 tracking-wide">إدارة طاقم المدرسة</p>
-        </div>
-        <button 
-          onClick={() => setIsInviteModalOpen(true)}
-          className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-[0_8px_16px_rgba(47,171,153,0.3)] active:scale-95 transition-all"
-        >
-          <Icon name="Plus" size={24} />
-        </button>
-      </header>
+      <AppHeader title="الاداريين" />
 
       {/* Staff List */}
       <main className="flex-1 px-4 py-6 space-y-4">
+        <div className="px-2 pb-2">
+          <p className="text-xl text-gray-500 font-medium">إدارة طاقم المدرسة</p>
+        </div>
         {staffList.length === 0 ? (
           <div className="text-center p-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
             <Icon name="Users" size={48} className="mx-auto text-outline-variant mb-4 opacity-50" />
@@ -121,15 +115,12 @@ export default function StaffManagementScreen() {
               onClick={() => navigate(`/staff/${staff.id}`)}
               className="bg-surface rounded-2xl p-4 flex items-center gap-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-outline-variant/20 active:scale-[0.98] transition-transform cursor-pointer"
             >
-              <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-surface-container-high border-2 border-primary-container">
-                {staff.avatarUrl ? (
-                  <img src={staff.avatarUrl} alt={staff.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-primary font-bold text-lg">
-                    {staff.name.charAt(0)}
-                  </div>
-                )}
-              </div>
+              <Avatar 
+                name={staff.name} 
+                imageUrl={staff.avatarUrl} 
+                shape="square" 
+                size="md" 
+              />
               
               <div className="flex-1">
                 <h3 className="font-bold text-on-surface text-lg leading-tight">{staff.name}</h3>
@@ -147,6 +138,15 @@ export default function StaffManagementScreen() {
           ))
         )}
       </main>
+      
+      {/* Floating Action Button (FAB) */}
+      <button 
+        onClick={() => setIsInviteModalOpen(true)}
+        className="fixed bottom-24 left-6 w-14 h-14 bg-vertex-teal text-white rounded-full flex items-center justify-center shadow-xl z-50 active:scale-90 transition-all duration-200"
+        aria-label="إضافة موظف"
+      >
+        <Icon name="Plus" size={28} />
+      </button>
 
       {/* Invitation Modal */}
       {isInviteModalOpen && (

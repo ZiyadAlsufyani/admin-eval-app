@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
+import { AppHeader } from '@/components/layout/AppHeader';
 import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
 import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
 import { formatISODate } from '@/utils/date';
@@ -414,14 +415,14 @@ export default function EvaluationFormScreen() {
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
 
       {/* TopAppBar */}
-      <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-none border-b border-surface-container pt-safe">
-        <div className="flex items-center gap-4 w-full px-6 h-16">
+      <AppHeader
+        title={`تقييم ${staff.name}`}
+        actions={
           <button aria-label="العودة" onClick={() => navigate(-1)} className="text-secondary hover:bg-surface-container/50 transition-colors p-2 rounded-full cursor-pointer">
             <Icon name="ArrowRight" size={24} />
           </button>
-          <h1 className="font-bold tracking-tight text-foreground text-lg">تقييم {staff.name}</h1>
-        </div>
-      </header>
+        }
+      />
 
       <main className="max-w-md mx-auto px-4 py-6 space-y-6">
 

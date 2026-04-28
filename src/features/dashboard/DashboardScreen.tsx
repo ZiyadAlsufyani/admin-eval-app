@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCumulativePerformanceQuery } from '@/api/evaluations';
+import { AppHeader } from '@/components/layout/AppHeader';
 
 export default function DashboardScreen() {
   const { staffList, academicContext } = useOutletContext<StaffOutletContext>();
@@ -35,16 +36,11 @@ export default function DashboardScreen() {
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
       
-      {/* Stitch Header */}
-      <header className="w-full top-0 sticky bg-surface flex flex-row-reverse justify-between items-center px-6 py-4 h-16 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-container border-2 border-vertex-teal">
-            <img 
-              alt="User Avatar" 
-              className="w-full h-full object-cover" 
-              src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png" 
-            />
-          </div>
+      {/* App Header */}
+      <AppHeader
+        title={profile?.full_name || 'المدير'}
+        titleClassName="text-xl font-extrabold text-vertex-teal tracking-tight"
+        actions={
           <button 
             onClick={async () => {
               await supabase.auth.signOut();
@@ -55,11 +51,8 @@ export default function DashboardScreen() {
           >
             <Icon name="LogOut" size={24} />
           </button>
-        </div>
-        <div className="flex flex-col items-end">
-          <h1 className="text-xl font-extrabold text-vertex-teal tracking-tight">{profile?.full_name || 'المدير'}</h1>
-        </div>
-      </header>
+        }
+      />
 
       <main className="px-5 pt-2 space-y-6">
         

@@ -3,6 +3,8 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { getTermWeeks } from '@/utils/academicCalendar';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { Avatar } from '@/components/ui/Avatar';
 
 export default function PendingEvaluationsScreen() {
   const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext, currentAcademicContext, holidays } = useOutletContext<StaffOutletContext>();
@@ -19,21 +21,14 @@ export default function PendingEvaluationsScreen() {
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
       
-      <header className="w-full top-0 sticky z-50 bg-surface/90 backdrop-blur-md border-none flex justify-between items-center px-6 py-4 pt-safe h-16">
-        <h1 className="text-xl font-bold text-foreground">التقييمات المعلقة</h1>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border-2 border-vertex-teal">
-            <img 
-              className="w-full h-full object-cover" 
-              alt="User Avatar" 
-              src="https://i.ibb.co/Rk028yp0/Gemini-Generated-Image-koaeh9koaeh9koae.png"
-            />
-          </div>
+      <AppHeader
+        title="التقييمات المعلقة"
+        actions={
           <button aria-label="الإشعارات" className="text-vertex-teal p-2 hover:bg-vertex-teal/10 rounded-full transition-transform active:scale-95 duration-200">
             <Icon name="Bell" size={24} />
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <main className="px-6 pt-4 space-y-6">
         
@@ -110,10 +105,11 @@ export default function PendingEvaluationsScreen() {
                 <div key={staff.id} className="bg-surface-container-lowest p-4 rounded-xl shadow-[0px_12px_32px_rgba(0,0,0,0.03)] border border-surface-container space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="relative">
-                      <img 
-                        className="w-14 h-14 rounded-xl object-cover border border-surface-container" 
-                        alt={staff.name} 
-                        src={staff.avatarUrl || `https://ui-avatars.com/api/?name=${staff.name}&background=random`} 
+                      <Avatar 
+                        name={staff.name} 
+                        imageUrl={staff.avatarUrl} 
+                        shape="square" 
+                        size="md" 
                       />
                       <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${indicatorColor} rounded-full border-2 border-white`} />
                     </div>
