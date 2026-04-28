@@ -12,6 +12,7 @@ import { formatISODate } from '@/utils/date';
 // ---- Draft shape stored in IDB ----
 interface EvaluationDraft {
   ratings: Record<string, number>;
+  justifications: Record<string, string>;
   notes: string;
   pendingUploads: Record<string, { file: File }[]>;
 }
@@ -59,6 +60,7 @@ export default function EvaluationFormScreen() {
       if (draft) {
         isRestoredRef.current = true;
         setRatings(draft.ratings || {});
+        setJustifications(draft.justifications || {});
         setNotes(draft.notes || '');
         // Reconstruct File previews from stored File objects
         const restoredUploads: Record<string, { file: File; preview: string }[]> = {};
@@ -107,12 +109,14 @@ export default function EvaluationFormScreen() {
 
     const hasDraftContent =
       Object.keys(ratings).length > 0 ||
+      Object.keys(justifications).length > 0 ||
       notes.length > 0 ||
       Object.values(pendingUploads).some(arr => arr.length > 0);
 
     if (hasDraftContent) {
       const storable: EvaluationDraft = {
         ratings,
+        justifications,
         notes,
         pendingUploads: Object.fromEntries(
           Object.entries(pendingUploads).map(([cat, items]) => [cat, items.map(i => ({ file: i.file }))])
@@ -122,7 +126,7 @@ export default function EvaluationFormScreen() {
     } else {
       idbDel(idbKey).catch(console.error);
     }
-  }, [pendingUploads, ratings, notes, isIDBLoaded, idbKey]);
+  }, [pendingUploads, ratings, justifications, notes, isIDBLoaded, idbKey]);
 
   // ---- ObjectURL cleanup on unmount ----
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -475,12 +479,18 @@ export default function EvaluationFormScreen() {
 
                 {/* Optional Justification + Paperclip */}
                 <div className="flex gap-2 items-start mt-2">
-                  <textarea
-                    value={justifications[q.id] || ''}
-                    onChange={(e) => handleJustification(q.id, e.target.value)}
-                    className="flex-1 text-[11px] p-2.5 bg-surface-container border-none rounded-lg focus:ring-2 focus:ring-vertex-teal min-h-[60px] resize-none"
-                    placeholder="أضف مبررات التقييم..."
-                  />
+                  <div className="flex-1 flex flex-col gap-1">
+                    <textarea
+                      maxLength={250}
+                      value={justifications[q.id] || ''}
+                      onChange={(e) => handleJustification(q.id, e.target.value)}
+                      className="text-[11px] p-2.5 bg-surface-container border-none rounded-lg focus:ring-2 focus:ring-vertex-teal min-h-[60px] resize-none"
+                      placeholder="أضف مبررات التقييم..."
+                    />
+                    <div className="text-[10px] text-secondary text-end px-1" dir="ltr">
+                      {(justifications[q.id] || '').length} / 250
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => triggerFileUpload(q.id)}
@@ -559,13 +569,14 @@ export default function EvaluationFormScreen() {
           </div>
           <div className="bg-surface-container-lowest border border-surface-container rounded-xl p-1 shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-vertex-teal transition-all">
             <textarea
+              maxLength={1000}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full min-h-[120px] p-4 bg-transparent border-none focus:ring-0 text-sm resize-none"
               placeholder="أدخل ملاحظات التقييم النوعي هنا..."
             />
             <div className="px-4 py-2 border-t border-surface-container flex justify-end">
-              <span className="text-[10px] text-secondary">الحد الأقصى 500 كلمة</span>
+              <span className="text-[10px] text-secondary" dir="ltr">{notes.length} / 1000</span>
             </div>
           </div>
         </section>
