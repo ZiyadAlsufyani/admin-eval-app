@@ -89,6 +89,36 @@ export function useSaveEvaluationMutation() {
       queryClient.invalidateQueries({
         queryKey: ['staff', variables.week_start_date],
       });
+      // Invalidate cumulative performance
+      queryClient.invalidateQueries({
+        queryKey: ['cumulative_performance', variables.school_id, variables.academic_year],
+      });
     },
+  });
+}
+
+export function useCumulativePerformanceQuery(schoolId: string | undefined, academicYear: string | undefined) {
+  return useQuery({
+    queryKey: ['cumulative_performance', schoolId, academicYear],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_cumulative_staff_averages', {
+        p_academic_year: academicYear,
+        p_school_id: schoolId,
+      });
+
+      if (error) {
+        console.error("RPC Error:", error);
+        throw error;
+      }
+
+      // Transform array into a fast O(1) lookup dictionary map
+      const performanceMap: Record<string, number> = {};
+      data?.forEach((row: { staff_id: string; average_score: number }) => {
+        performanceMap[row.staff_id] = Number(row.average_score);
+      });
+      
+      return performanceMap;
+    },
+    enabled: !!schoolId && !!academicYear,
   });
 }

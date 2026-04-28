@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/icon';
 import { supabase } from '@/lib/supabase';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useCumulativePerformanceQuery } from '@/api/evaluations';
 
 export default function DashboardScreen() {
   const { staffList, academicContext } = useOutletContext<StaffOutletContext>();
@@ -11,17 +12,25 @@ export default function DashboardScreen() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
 
-  // Derived Statistics from arbitrary number of staff
-  const staffCount = staffList.length;
-  const avgDiscipline = Math.round(
-    staffList.reduce((acc, curr) => acc + curr.metrics.discipline.score, 0) / (staffCount || 1)
+  // Fetch cumulative staff averages from the database
+  const { data: cumulativeData = {} } = useCumulativePerformanceQuery(
+    profile?.school_id, 
+    academicContext?.activeTerm.academic_year
   );
+
+  // Derived Statistics from true database averages
+  const staffCount = staffList.length;
+  
+  const totalCumulativeScore = staffList.reduce((acc, curr) => acc + (cumulativeData[curr.id] || 0), 0);
+  const avgDiscipline = staffCount > 0 ? Math.round(totalCumulativeScore / staffCount) : 0;
   
   // Calculate a 5-point scale rating (e.g. 88% -> 4.4)
   const avgRating = (avgDiscipline / 20).toFixed(1);
 
-  // Compute pending items (Mock logic: staff with score < 85 need follow up)
-  const pendingCount = staffList.filter((s) => s.metrics.competencies.score < 85).length;
+  // Compute pending items for the current week based on completion status
+  const pendingCount = staffCount > 0 
+    ? Math.max(0, staffCount - staffList.filter((s) => s.status === 'مكتمل').length)
+    : 0;
 
   return (
     <div className="bg-surface text-foreground min-h-screen pb-24 font-sans" dir="rtl">
@@ -115,17 +124,19 @@ export default function DashboardScreen() {
           <div className="bg-surface-container-lowest p-5 rounded-xl shadow-sm border border-surface-container">
             <div className="space-y-4">
               {staffList.map((staff) => {
-                const score = staff.metrics.discipline.score;
+                const score = cumulativeData[staff.id];
+                const displayScore = score !== undefined ? Math.round(score) : 0;
+                const hasData = score !== undefined;
                 
                 // Dynamic Range Logic
-                const isCritical = score < 60;
-                const isWarning = score >= 60 && score < 75;
-                const isGood = score >= 75 && score < 85;
+                const isCritical = displayScore > 0 && displayScore < 60;
+                const isWarning = displayScore >= 60 && displayScore < 75;
+                const isGood = displayScore >= 75 && displayScore < 85;
 
                 // Derive specific color tailwind classes
                 const wrapClass = isCritical ? 'bg-orange-50 -mx-2 p-2 rounded-lg' : isWarning ? 'bg-warning-bg -mx-2 p-2 rounded-lg' : '';
-                const barColor = isCritical ? 'bg-orange-500' : isWarning ? 'bg-warning-soft' : isGood ? 'bg-vertex-teal' : 'bg-primary';
-                const textClass = isCritical ? 'text-orange-600' : isWarning ? 'text-warning-soft' : 'text-secondary';
+                const barColor = !hasData ? 'bg-surface-container' : isCritical ? 'bg-orange-500' : isWarning ? 'bg-warning-soft' : isGood ? 'bg-vertex-teal' : 'bg-primary';
+                const textClass = !hasData ? 'text-outline' : isCritical ? 'text-orange-600' : isWarning ? 'text-warning-soft' : 'text-secondary';
                 
                 return (
                   <div key={staff.id} className={`flex items-center gap-3 transition-colors duration-500 ${wrapClass}`}>
@@ -135,14 +146,14 @@ export default function DashboardScreen() {
                     <div className="flex-1 h-2.5 bg-surface-container-low rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`} 
-                        style={{ width: `${score}%` }} 
+                        style={{ width: `${hasData ? displayScore : 0}%` }} 
                       />
                     </div>
                     
                     {/* Right side metrics & alerts */}
-                    <div className="flex items-center gap-1 w-12 justify-end">
-                      <span className={`text-[11px] font-bold transition-colors duration-500 ${textClass}`}>
-                        {score}%
+                    <div className="flex items-center gap-1 w-20 justify-end">
+                      <span className={`text-[11px] font-bold transition-colors duration-500 ${textClass} text-left`}>
+                        {hasData ? `${displayScore}%` : 'لا توجد بيانات'}
                       </span>
                       {(isCritical || isWarning) && (
                         <Icon 
