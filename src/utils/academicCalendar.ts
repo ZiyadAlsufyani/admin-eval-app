@@ -6,20 +6,19 @@ export interface AcademicTerm {
   end_date: string;
 }
 
+export interface Holiday {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
 export interface AcademicContext {
   activeTerm: AcademicTerm;
   weekNumber: number;
+  isHoliday?: boolean;
 }
 
-/**
- * Calculates the difference in days between two dates.
- */
-function daysBetween(startDate: Date, endDate: Date): number {
-  const oneDay = 1000 * 60 * 60 * 24;
-  const start = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-  const end = Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-  return Math.floor((end - start) / oneDay);
-}
 
 /**
  * Finds the Sunday of the week containing the given date.
@@ -34,9 +33,11 @@ export function getSundayAnchor(date: Date): Date {
 
 /**
  * Engine to determine the active term and week number based on a given date.
- * Returns null if the date falls outside of any active term (holiday/break).
+ * Returns null only if the date falls outside of all academic terms.
+ * If the date is within a term but during a holiday/break week, returns an
+ * AcademicContext with `isHoliday` set to true.
  */
-export function getAcademicContext(currentDate: Date, terms: AcademicTerm[]): AcademicContext | null {
+export function getAcademicContext(currentDate: Date, terms: AcademicTerm[], holidays: Holiday[] = []): AcademicContext | null {
   // Reset time part for accurate date comparison
   const compareDate = new Date(currentDate);
   compareDate.setHours(0, 0, 0, 0);
@@ -52,20 +53,44 @@ export function getAcademicContext(currentDate: Date, terms: AcademicTerm[]): Ac
   });
 
   if (!activeTerm) {
-    return null; // Holiday or outside bounds
+    return null; // Outside bounds of any academic term
   }
 
-  // Calculate the week number using Sunday Anchor
+  // Calculate the week number using Valid Sundays
   const termStartDate = new Date(activeTerm.start_date);
   const anchorDate = getSundayAnchor(termStartDate);
   const currentSunday = getSundayAnchor(compareDate);
 
-  const daysDiff = daysBetween(anchorDate, currentSunday);
-  const weekNumber = Math.floor(daysDiff / 7) + 1;
+  let weekNumber = 0;
+  let isCurrentWeekHoliday = false;
+  const loopDate = new Date(anchorDate);
+
+  while (loopDate <= currentSunday) {
+    // Check if loopDate falls inside any holiday
+    const isHolidayWeek = holidays.some(holiday => {
+      const start = new Date(holiday.start_date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(holiday.end_date);
+      end.setHours(23, 59, 59, 999);
+      return loopDate >= start && loopDate <= end;
+    });
+
+    if (loopDate.getTime() === currentSunday.getTime()) {
+      isCurrentWeekHoliday = isHolidayWeek;
+    }
+
+    if (!isHolidayWeek) {
+      weekNumber++;
+    }
+
+    // Move to next Sunday
+    loopDate.setDate(loopDate.getDate() + 7);
+  }
 
   return {
     activeTerm,
-    weekNumber
+    weekNumber,
+    isHoliday: isCurrentWeekHoliday
   };
 }
 
@@ -73,26 +98,41 @@ export function getAcademicContext(currentDate: Date, terms: AcademicTerm[]): Ac
  * Generates an array of weeks for the UI selector, bounded by the active term.
  * Shows weeks from the current week down to week 1 of the term.
  */
-export function getTermWeeks(activeTerm: AcademicTerm, currentWeekNumber: number) {
-  const weeks = [];
+export function getTermWeeks(activeTerm: AcademicTerm, currentWeekNumber: number, holidays: Holiday[] = []) {
   const termStart = new Date(activeTerm.start_date);
   const termAnchor = getSundayAnchor(termStart);
   
-  for (let i = 0; i < currentWeekNumber; i++) {
-    const start = new Date(termAnchor);
-    // (currentWeekNumber - 1 - i) goes from (current - 1) down to 0
-    start.setDate(start.getDate() + ((currentWeekNumber - 1 - i) * 7));
-    
-    const end = new Date(start);
-    end.setDate(start.getDate() + 4); // Thursday
-    end.setHours(23, 59, 59, 999);
-    
-    weeks.push({
-      start,
-      end,
-      label: `الأسبوع ${currentWeekNumber - i}`,
-      shortFormat: `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`
+  const validWeeks = [];
+  const loopDate = new Date(termAnchor);
+  
+  // Find all valid weeks from term start up to currentWeekNumber
+  while (validWeeks.length < currentWeekNumber) {
+    const isHolidayWeek = holidays.some(holiday => {
+      const start = new Date(holiday.start_date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(holiday.end_date);
+      end.setHours(23, 59, 59, 999);
+      return loopDate >= start && loopDate <= end;
     });
+
+    if (!isHolidayWeek) {
+      const start = new Date(loopDate);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 4); // Thursday
+      end.setHours(23, 59, 59, 999);
+      
+      validWeeks.push({
+        start,
+        end,
+        label: `الأسبوع ${validWeeks.length + 1}`,
+        shortFormat: `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`
+      });
+    }
+    
+    // Move to next Sunday
+    loopDate.setDate(loopDate.getDate() + 7);
   }
-  return weeks;
+  
+  // The UI expects weeks from current down to 1
+  return validWeeks.reverse();
 }

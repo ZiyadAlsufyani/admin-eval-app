@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStaffQuery } from '@/api/staff';
 import { Icon } from '@/components/ui/icon';
+import { AppHeader } from '@/components/layout/AppHeader';
 
 export default function StaffProfileScreen() {
   const { staffId } = useParams();
@@ -28,20 +29,17 @@ export default function StaffProfileScreen() {
   return (
     <div className="bg-surface text-on-surface min-h-screen pb-24 font-body" dir="rtl">
       {/* Top App Bar - Fixed Back Button & Notification */}
-      <header className="bg-surface sticky top-0 w-full z-50 shadow-sm">
-        <div className="flex flex-row-reverse justify-between items-center w-full px-4 py-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 invisible">
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-brand-teal/20" />
-          </div>
-          <h1 className="text-xl font-bold text-on-surface font-headline tracking-tight">ملف الموظف</h1>
+      <AppHeader
+        title="ملف الموظف"
+        actions={
           <button 
             onClick={() => navigate('/staff')}
             className="text-secondary hover:bg-surface-container transition-colors p-2 rounded-xl active:scale-95 duration-200"
           >
             <Icon name="ArrowRight" size={24} />
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <main className="pt-6 px-4 max-w-lg mx-auto space-y-6">
         {/* Profile Header Section */}
