@@ -18,6 +18,7 @@ export default function StaffManagementScreen() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState('');
+  const [isWhatsAppLoading, setIsWhatsAppLoading] = useState(false);
 
   const handleDeleteStaff = async (staffId: string, staffName: string, e: React.MouseEvent) => {
     e.stopPropagation(); // prevent navigation to profile
@@ -86,6 +87,36 @@ export default function StaffManagementScreen() {
       setInviteError('فشل إرسال الدعوة. تأكد من البريد الإلكتروني والمحاولة مرة أخرى');
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const handleWhatsAppInvite = async () => {
+    setIsWhatsAppLoading(true);
+    setInviteError('');
+
+    try {
+      if (!profile?.school_id) throw new Error('Could not identify school');
+
+      // Insert generic token invite (null email)
+      const { data, error: insertErr } = await supabase
+        .from('staff_invitations')
+        .insert([{ email: null, school_id: profile.school_id }])
+        .select()
+        .single();
+
+      if (insertErr) throw insertErr;
+
+      const token = data.token;
+      const inviteUrl = `${window.location.origin}/signup/staff?token=${token}`;
+      const text = encodeURIComponent(`انضم إلى مدرستنا على تطبيق التقييم. اضغط هنا للتسجيل: ${inviteUrl}`);
+      
+      window.location.href = `whatsapp://send?text=${text}`;
+      setIsInviteModalOpen(false);
+    } catch (err) {
+      console.error('Failed to generate WhatsApp invite', err);
+      setInviteError('فشل إنشاء رابط الدعوة.');
+    } finally {
+      setIsWhatsAppLoading(false);
     }
   };
 
@@ -187,6 +218,27 @@ export default function StaffManagementScreen() {
                 </button>
               </div>
             </form>
+
+            <div className="relative flex items-center py-4">
+              <div className="flex-grow border-t border-surface-container-highest"></div>
+              <span className="flex-shrink-0 mx-4 text-on-surface-variant text-sm">أو</span>
+              <div className="flex-grow border-t border-surface-container-highest"></div>
+            </div>
+
+            <button
+              onClick={handleWhatsAppInvite}
+              disabled={isWhatsAppLoading}
+              className="w-full py-3.5 rounded-xl bg-[#25D366] hover:bg-[#1DA851] text-white font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:active:scale-100 active:scale-[0.98]"
+            >
+              {isWhatsAppLoading ? (
+                <>جاري الإنشاء...</>
+              ) : (
+                <>
+                  <Icon name="MessageCircle" size={20} />
+                  دعوة عبر واتساب
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}

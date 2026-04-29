@@ -6,10 +6,12 @@ import { Icon } from '@/components/ui/icon';
 export default function StaffSignUpScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
   
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isEmailLocked, setIsEmailLocked] = useState(false);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -19,8 +21,12 @@ export default function StaffSignUpScreen() {
     const urlEmail = searchParams.get('email');
     if (urlEmail) {
       setEmail(urlEmail);
+      setIsEmailLocked(true);
+    } else if (token) {
+      // It's a WhatsApp token (no email known yet), we will rely on token for lookup
+      setIsEmailLocked(false);
     }
-  }, [searchParams]);
+  }, [searchParams, token]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +41,8 @@ export default function StaffSignUpScreen() {
         options: {
           data: {
             full_name: fullName,
-            role: 'staff'
+            role: 'staff',
+            ...(token ? { invite_token: token } : {})
           }
         }
       });
@@ -104,20 +111,23 @@ export default function StaffSignUpScreen() {
             </div>
           </div>
 
-          {/* Email Field (Pre-filled logic applied) */}
+          {/* Email Field (Dynamic lock logic applied) */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-secondary mr-2 tracking-wide uppercase">البريد الإلكتروني المخصص للدعوة</label>
-            <div className="relative flex items-center bg-surface-container-highest border border-outline-variant/50 rounded-xl opacity-60 cursor-not-allowed transition-all duration-300">
+            <label className="block text-xs font-bold text-secondary mr-2 tracking-wide uppercase">
+              {isEmailLocked ? 'البريد الإلكتروني المخصص للدعوة' : 'البريد الإلكتروني'}
+            </label>
+            <div className={`relative flex items-center bg-surface-container-highest border border-outline-variant/50 rounded-xl transition-all duration-300 ${isEmailLocked ? 'opacity-60 cursor-not-allowed' : 'group focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20'}`}>
               <input 
                 required 
-                readOnly
+                readOnly={isEmailLocked}
                 value={email}
-                className="w-full bg-transparent border-0 focus:ring-0 px-4 py-4 pr-12 text-on-surface font-bold outline-none cursor-not-allowed" 
+                onChange={!isEmailLocked ? (e) => setEmail(e.target.value) : undefined}
+                className={`w-full bg-transparent border-0 focus:ring-0 px-4 py-4 pr-12 text-on-surface font-bold outline-none ${isEmailLocked ? 'cursor-not-allowed' : ''}`} 
                 placeholder="example@school.com" 
                 type="email"
                 dir="ltr"
               />
-              <Icon name="Lock" size={20} className="absolute right-4 text-outline" />
+              <Icon name={isEmailLocked ? "Lock" : "Mail"} size={20} className="absolute right-4 text-outline" />
             </div>
           </div>
 

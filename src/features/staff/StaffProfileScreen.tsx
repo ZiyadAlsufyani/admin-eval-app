@@ -17,6 +17,9 @@ export default function StaffProfileScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
   const { data: staffList = [], isLoading } = useStaffQuery();
+  const { academicContext } = useOutletContext<StaffOutletContext>();
+  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(staffId, academicContext?.activeTerm?.academic_year);
+  const [activePoint, setActivePoint] = useState<number | null>(null);
 
   const staff = staffList.find(s => s.id === staffId);
 
@@ -33,9 +36,6 @@ export default function StaffProfileScreen() {
     );
   }
 
-  const { academicContext } = useOutletContext<StaffOutletContext>();
-  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(staffId, academicContext?.activeTerm.academic_year);
-
   // Use the latest score for the top card, fallback to 0
   const latestEvaluation = historyData[0];
   const grade = latestEvaluation?.overall_score_percentage || 0;
@@ -47,8 +47,6 @@ export default function StaffProfileScreen() {
 
   const joinYear = staff.created_at ? new Date(staff.created_at).getFullYear() : new Date().getFullYear();
   const starRating = avgDiscipline > 0 ? (avgDiscipline / 20).toFixed(1) : "0.0";
-
-  const [activePoint, setActivePoint] = useState<number | null>(null);
 
   const TOP_PADDING = 20;
   const RIGHT_TEXT_PADDING = 30;

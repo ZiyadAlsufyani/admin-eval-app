@@ -4,6 +4,7 @@ import { useEvaluationDetailQuery } from '@/api/evaluations';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Icon } from '@/components/ui/icon';
+import { CATEGORY_TRANSLATIONS } from '@/constants/evaluations';
 
 export default function EvaluationDetailScreen() {
   const { evaluationId } = useParams();
@@ -122,15 +123,17 @@ export default function EvaluationDetailScreen() {
             <h3 className="text-sm font-bold text-on-surface mb-3 px-1">تفاصيل التقييم</h3>
             <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 overflow-hidden">
               {details.map((detail: any, index: number) => (
-                <div key={detail.id || index} className={`p-4 flex items-center justify-between ${index < details.length - 1 ? 'border-b border-outline-variant/30' : ''}`}>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-on-surface text-sm">{detail.category_name}</span>
+                <div key={detail.id || index} className={`p-4 flex items-start justify-between gap-4 ${index < details.length - 1 ? 'border-b border-outline-variant/30' : ''}`}>
+                  <div className="flex flex-col flex-1">
+                    <span className="font-bold text-on-surface text-sm">
+                      {CATEGORY_TRANSLATIONS[detail.category_name] || detail.category_name}
+                    </span>
                     {detail.justification_notes && (
                       <span className="text-xs text-secondary mt-1">{detail.justification_notes}</span>
                     )}
                   </div>
-                  <div className="bg-surface-container px-3 py-1 rounded-lg text-primary font-bold text-sm" dir="ltr">
-                    {detail.score} / 5
+                  <div className="bg-surface-container px-3 py-1 rounded-lg text-primary font-bold text-sm shrink-0 min-w-[70px] text-center" dir="ltr">
+                    5 / {detail.score}
                   </div>
                 </div>
               ))}
