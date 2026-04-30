@@ -63,12 +63,15 @@ export function MobileLayout() {
   const currentPath = location.pathname;
   let activeTab = 'home';
   if (currentPath === '/tasks' || currentPath.startsWith('/evaluate')) activeTab = 'tasks';
-  if (currentPath.startsWith('/staff')) activeTab = 'staff';
+  else if (currentPath.startsWith('/staff-dashboard')) activeTab = 'home';
+  else if (currentPath.startsWith('/staff-profile')) activeTab = 'profile';
+  else if (currentPath.startsWith('/staff')) activeTab = 'staff';
 
   const handleNavigation = (id: string) => {
     if (id === 'home') navigate(isPrincipal ? '/admin-dashboard' : '/staff-dashboard');
     if (id === 'tasks') navigate('/tasks');
     if (id === 'staff') navigate('/staff');
+    if (id === 'profile') navigate('/staff-profile');
   };
 
   if (isLoading && isPrincipal) {
@@ -85,6 +88,7 @@ export function MobileLayout() {
     { id: 'staff', label: 'الاداريين', icon: 'Users' as const, href: '/staff' },
   ] : [
     { id: 'home', label: 'الرئيسية', icon: 'Home' as const, href: '/staff-dashboard' },
+    { id: 'profile', label: 'ملفي', icon: 'User' as const, href: '/staff-profile' },
   ];
 
   return (

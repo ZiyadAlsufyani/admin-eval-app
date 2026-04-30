@@ -26,7 +26,8 @@ function App() {
           
           <Route element={<MobileLayout />}>
             <Route path="/admin-dashboard" element={<DashboardScreen />} />
-            <Route path="/staff-dashboard" element={<div className="p-8 text-center text-primary font-bold">لوحة تحكم المعلم (قيد التطوير)</div>} />
+            <Route path="/staff-dashboard" element={<DashboardScreen />} />
+            <Route path="/staff-profile" element={<StaffProfileScreen />} />
             <Route path="/staff" element={<StaffManagementScreen />} />
             <Route path="/staff/:staffId" element={<StaffProfileScreen />} />
             <Route path="/tasks" element={<PendingEvaluationsScreen />} />
