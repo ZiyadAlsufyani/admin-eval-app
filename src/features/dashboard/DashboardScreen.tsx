@@ -57,25 +57,27 @@ export default function DashboardScreen() {
       <main className="px-5 pt-2 space-y-6">
         
         {/* Urgent Actions Hero Section */}
-        <section className="space-y-3">
-          <div className="flex justify-between items-center">
-            <h2 className="text-sm font-extrabold text-foreground">إجراءات عاجلة</h2>
-          </div>
-          <div className="bg-vertex-teal text-white p-6 rounded-xl shadow-lg flex justify-between items-center relative overflow-hidden">
-            <div className="z-10">
-              <span className="text-xs font-medium opacity-90 block mb-1">التقييمات المعلقة</span>
-              <span className="text-4xl font-black block">{pendingCount}</span>
-              <button 
-                onClick={() => navigate('/tasks')}
-                className="mt-4 bg-white text-vertex-teal px-4 py-2 rounded-lg text-xs font-extrabold shadow-md active:scale-95 transition-transform"
-              >
-                ابدأ التقييم الآن
-              </button>
+        {profile?.role === 'principal' && (
+          <section className="space-y-3">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-extrabold text-foreground">إجراءات عاجلة</h2>
             </div>
-            {/* Background Icon */}
-            <Icon name="Clock" size={120} className="text-white/20 absolute -left-4 -bottom-4" />
-          </div>
-        </section>
+            <div className="bg-vertex-teal text-white p-6 rounded-xl shadow-lg flex justify-between items-center relative overflow-hidden">
+              <div className="z-10">
+                <span className="text-xs font-medium opacity-90 block mb-1">التقييمات المعلقة</span>
+                <span className="text-4xl font-black block">{pendingCount}</span>
+                <button 
+                  onClick={() => navigate('/tasks')}
+                  className="mt-4 bg-white text-vertex-teal px-4 py-2 rounded-lg text-xs font-extrabold shadow-md active:scale-95 transition-transform"
+                >
+                  ابدأ التقييم الآن
+                </button>
+              </div>
+              {/* Background Icon */}
+              <Icon name="Clock" size={120} className="text-white/20 absolute -left-4 -bottom-4" />
+            </div>
+          </section>
+        )}
 
         {/* Academic Context Indicator */}
         {academicContext && (
@@ -110,7 +112,7 @@ export default function DashboardScreen() {
         {/* Live Performance Tracking List */}
         <section className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-sm font-extrabold text-foreground">أداء يحتاج إلى متابعة</h2>
+            <h2 className="text-sm font-extrabold text-foreground">متوسط الأداء الأسبوعي</h2>
             <span className="text-[10px] font-bold text-vertex-teal cursor-pointer hover:underline">عرض سجل الأداء</span>
           </div>
           

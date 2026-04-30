@@ -6,6 +6,7 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { Icon } from '@/components/ui/icon';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
   if (data.length <= maxPoints) return data;
@@ -16,12 +17,17 @@ function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
 export default function StaffProfileScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  
+  const isPrincipal = profile?.role === 'principal';
+  const effectiveStaffId = isPrincipal ? staffId : profile?.id;
+
   const { data: staffList = [], isLoading } = useStaffQuery();
   const { academicContext } = useOutletContext<StaffOutletContext>();
-  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(staffId, academicContext?.activeTerm?.academic_year);
+  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, academicContext?.activeTerm?.academic_year);
   const [activePoint, setActivePoint] = useState<number | null>(null);
 
-  const staff = staffList.find(s => s.id === staffId);
+  const staff = staffList.find(s => s.id === effectiveStaffId);
 
   if (isLoading) {
     return <div className="p-8 text-center bg-surface min-h-screen text-primary font-bold">جاري التحميل...</div>;
@@ -81,7 +87,7 @@ export default function StaffProfileScreen() {
         title="ملف الموظف"
         actions={
           <button 
-            onClick={() => navigate('/staff')}
+            onClick={() => navigate(isPrincipal ? '/staff' : '/staff-dashboard')}
             className="text-secondary hover:bg-surface-container transition-colors p-2 rounded-xl active:scale-95 duration-200"
           >
             <Icon name="ArrowRight" size={24} />
@@ -241,12 +247,14 @@ export default function StaffProfileScreen() {
         <section className="space-y-4 pb-4">
           <div className="flex justify-between items-center px-1">
             <h3 className="text-sm font-bold text-on-surface font-headline">التقييمات السابقة</h3>
-            <button 
-              onClick={() => navigate(`/staff/${staff.id}/evaluations`)}
-              className="text-primary text-[11px] font-bold hover:underline"
-            >
-              عرض الكل
-            </button>
+            {isPrincipal && (
+              <button 
+                onClick={() => navigate(`/staff/${staff.id}/evaluations`)}
+                className="text-primary text-[11px] font-bold hover:underline"
+              >
+                عرض الكل
+              </button>
+            )}
           </div>
           
           <div className="space-y-3">

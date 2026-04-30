@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/ui/icon';
+import { AppHeader } from '@/components/layout/AppHeader';
 
 export default function StaffSignUpScreen() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function StaffSignUpScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isEmailLocked, setIsEmailLocked] = useState(false);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,12 +72,12 @@ export default function StaffSignUpScreen() {
 
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col items-center selection:bg-primary-container selection:text-on-primary-container" dir="rtl">
-      <header className="w-full top-0 sticky z-50 bg-surface flex flex-row-reverse justify-between items-center px-4 py-3 shadow-sm border-b border-outline-variant/10">
+      <AppHeader>
         <div className="flex items-center gap-2">
           <Icon name="Users" size={28} className="text-secondary" />
-          <span className="text-lg font-bold tracking-tighter text-secondary">بوابة المعلمين</span>
+          <span className="text-lg font-bold tracking-tighter text-secondary">بوابة الإداريين</span>
         </div>
-      </header>
+      </AppHeader>
 
       <main className="w-full max-w-md px-6 pt-12 flex flex-col flex-grow">
         <section className="mb-10 text-right">
@@ -116,7 +118,7 @@ export default function StaffSignUpScreen() {
             <label className="block text-xs font-bold text-secondary mr-2 tracking-wide uppercase">
               {isEmailLocked ? 'البريد الإلكتروني المخصص للدعوة' : 'البريد الإلكتروني'}
             </label>
-            <div className={`relative flex items-center bg-surface-container-highest border border-outline-variant/50 rounded-xl transition-all duration-300 ${isEmailLocked ? 'opacity-60 cursor-not-allowed' : 'group focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20'}`}>
+            <div className={`relative flex items-center border border-outline-variant/50 rounded-xl transition-all duration-300 ${isEmailLocked ? 'bg-surface-container-highest opacity-60 cursor-not-allowed' : 'bg-surface-container-low group focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20'}`}>
               <input 
                 required 
                 readOnly={isEmailLocked}
@@ -139,12 +141,19 @@ export default function StaffSignUpScreen() {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-transparent border-0 focus:ring-0 px-4 py-4 pr-12 text-on-surface font-medium outline-none" 
+                className="w-full bg-transparent border-0 focus:ring-0 px-4 py-4 pr-24 text-on-surface font-medium outline-none" 
                 placeholder="••••••••" 
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 dir="ltr"
               />
               <Icon name="Lock" size={20} className="absolute right-4 text-outline group-focus-within:text-secondary transition-colors duration-300" />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-12 text-outline hover:text-secondary transition-colors duration-300"
+              >
+                <Icon name={showPassword ? "EyeOff" : "Eye"} size={20} />
+              </button>
             </div>
           </div>
 
