@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { useStaffQuery } from '@/api/staff';
 import { useStaffEvaluationsHistoryQuery } from '@/api/evaluations';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { Icon } from '@/components/ui/icon';
@@ -18,20 +17,27 @@ export default function StaffProfileScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  
+  const { staffList, academicContext } = useOutletContext<StaffOutletContext>();
+
   const isPrincipal = profile?.role === 'principal';
   const effectiveStaffId = isPrincipal ? staffId : profile?.id;
 
-  const { data: staffList = [], isLoading } = useStaffQuery();
-  const { academicContext } = useOutletContext<StaffOutletContext>();
+  // For principals: find from the already-fetched list in the outlet context.
+  // For staff: map directly from their own profile (already loaded, no extra fetch needed).
+  const staff = isPrincipal
+    ? staffList.find(s => s.id === effectiveStaffId)
+    : profile
+      ? {
+          id: profile.id,
+          name: profile.full_name,
+          role: profile.job_title || 'الاداري/ة',
+          avatarUrl: profile.avatar_url,
+          created_at: profile.created_at,
+        }
+      : undefined;
+
   const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, academicContext?.activeTerm?.academic_year);
   const [activePoint, setActivePoint] = useState<number | null>(null);
-
-  const staff = staffList.find(s => s.id === effectiveStaffId);
-
-  if (isLoading) {
-    return <div className="p-8 text-center bg-surface min-h-screen text-primary font-bold">جاري التحميل...</div>;
-  }
 
   if (!staff) {
     return (

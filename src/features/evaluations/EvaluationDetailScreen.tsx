@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvaluationDetailQuery } from '@/api/evaluations';
-import { supabase } from '@/lib/supabase';
+import { getEvidenceUrl } from '@/api/storage';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Icon } from '@/components/ui/icon';
 import { CATEGORY_TRANSLATIONS } from '@/constants/evaluations';
@@ -81,10 +81,8 @@ export default function EvaluationDetailScreen() {
     return url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null || url.startsWith('data:image');
   };
 
-  const getFileUrl = (path: string) => {
-    if (path.startsWith('http')) return path; // Already a full URL
-    return supabase.storage.from('evaluation_evidence').getPublicUrl(path).data.publicUrl;
-  };
+  const getFileUrl = (path: string) =>
+    path.startsWith('http') ? path : getEvidenceUrl(path);
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">

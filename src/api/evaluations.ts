@@ -129,7 +129,7 @@ export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, aca
     queryFn: async () => {
       const { data, error } = await supabase
         .from('discipline_evaluations')
-        .select('*')
+        .select('id, overall_score_percentage, academic_week_number, week_start_date')
         .eq('staff_id', staffId)
         .eq('academic_year', academicYear)
         .eq('status', 'submitted')

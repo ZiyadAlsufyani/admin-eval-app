@@ -91,7 +91,7 @@ export default function EvaluationFormScreen() {
         newRatings[detail.category_name] = detail.score;
         if (detail.justification_notes) newJustifs[detail.category_name] = detail.justification_notes;
         if (detail.attachments && Array.isArray(detail.attachments)) {
-          newAttachments[detail.category_name] = detail.attachments;
+          newAttachments[detail.category_name] = [...detail.attachments];
         }
       });
       setNotes(existingEvaluation.general_notes || '');
@@ -109,8 +109,8 @@ export default function EvaluationFormScreen() {
 
     const hasDraftContent =
       Object.keys(ratings).length > 0 ||
-      Object.keys(justifications).length > 0 ||
-      notes.length > 0 ||
+      Object.values(justifications).some(v => v.trim().length > 0) ||
+      notes.trim().length > 0 ||
       Object.values(pendingUploads).some(arr => arr.length > 0);
 
     if (hasDraftContent) {
@@ -160,7 +160,14 @@ export default function EvaluationFormScreen() {
   };
 
   const handleJustification = (questionId: string, text: string) => {
-    setJustifications(prev => ({ ...prev, [questionId]: text }));
+    setJustifications(prev => {
+      if (text === '') {
+        // Prune the key so empty strings don't ghost hasDraftContent
+        const { [questionId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [questionId]: text };
+    });
   };
 
   /**
