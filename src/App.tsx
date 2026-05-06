@@ -10,6 +10,7 @@ import SignUpScreen from './features/auth/SignUpScreen';
 import StaffSignUpScreen from './features/auth/StaffSignUpScreen';
 import StaffManagementScreen from './features/staff/StaffManagementScreen';
 import StaffProfileScreen from './features/staff/StaffProfileScreen';
+import StaffPortfolioScreen from './features/staff/StaffPortfolioScreen';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/admin-dashboard" element={<DashboardScreen />} />
             <Route path="/staff-dashboard" element={<DashboardScreen />} />
             <Route path="/staff-profile" element={<StaffProfileScreen />} />
+            <Route path="/staff-portfolio" element={<StaffPortfolioScreen />} />
             <Route path="/staff" element={<StaffManagementScreen />} />
             <Route path="/staff/:staffId" element={<StaffProfileScreen />} />
             <Route path="/tasks" element={<PendingEvaluationsScreen />} />
