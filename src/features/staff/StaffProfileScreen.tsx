@@ -13,6 +13,14 @@ function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
   return Array.from({ length: maxPoints }, (_, i) => data[Math.round(i * step)]);
 }
 
+interface EvaluationHistoryItem {
+  id: string;
+  overall_score_percentage: number;
+  month_week_number: number;
+  fiscal_month: number;
+  week_start_date: string;
+}
+
 export default function StaffProfileScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
@@ -66,9 +74,29 @@ export default function StaffProfileScreen() {
   const CHART_WIDTH = 400 - RIGHT_TEXT_PADDING;
   const CHART_HEIGHT = 100;
 
-  // Chart data calculations
-  const chronologicalData = [...historyData].reverse();
-  const displayData = sampleChartData(chronologicalData, 6);
+  // Group history by fiscal_month
+  const groupedHistory = historyData.reduce((acc: Record<number, EvaluationHistoryItem[]>, curr: any) => {
+    const item = curr as EvaluationHistoryItem;
+    const month = item.fiscal_month || 1;
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(item);
+    return acc;
+  }, {});
+  
+  // Sort months descending for the list view (newest first)
+  const sortedMonths = Object.keys(groupedHistory)
+    .map(Number)
+    .sort((a, b) => b - a);
+
+  // Chart data calculations (Monthly Averages)
+  const monthsInChronologicalOrder = [...sortedMonths].reverse(); // oldest first
+  const monthlyAverages = monthsInChronologicalOrder.map(month => {
+    const evals = groupedHistory[month];
+    const avg = evals.reduce((sum: number, item: EvaluationHistoryItem) => sum + (item.overall_score_percentage || 0), 0) / evals.length;
+    return { month, average: Math.round(avg) };
+  });
+
+  const displayData = sampleChartData(monthlyAverages, 6);
   
   const calculateX = (index: number) => {
     if (displayData.length === 1) return CHART_WIDTH;
@@ -76,11 +104,11 @@ export default function StaffProfileScreen() {
     return CHART_WIDTH - (index * spacing);
   };
 
-  const chartPoints = displayData.map((evalItem, i) => {
-    const score = evalItem.overall_score_percentage || 0;
+  const chartPoints = displayData.map((dataPoint, i) => {
+    const score = dataPoint.average || 0;
     const x = calculateX(i);
     const y = (CHART_HEIGHT - (score / 100) * CHART_HEIGHT) + TOP_PADDING;
-    return { x, y, score, week: `أسبوع ${evalItem.month_week_number || '?'}` };
+    return { x, y, score, label: `الشهر ${dataPoint.month}` };
   });
 
   const pathStr = displayData.length === 1 
@@ -243,7 +271,7 @@ export default function StaffProfileScreen() {
                         textAnchor="middle" 
                         className="fill-secondary text-[10px] font-medium"
                       >
-                        {p.week}
+                        {p.label}
                       </text>
                     </g>
                   ))}
@@ -260,7 +288,7 @@ export default function StaffProfileScreen() {
                     }}
                   >
                     <div className="font-black text-vertex-teal text-sm">{chartPoints[activePoint].score}%</div>
-                    <div className="text-[9px] font-bold text-secondary uppercase tracking-wider">{chartPoints[activePoint].week}</div>
+                    <div className="text-[9px] font-bold text-secondary uppercase tracking-wider">{chartPoints[activePoint].label}</div>
                     {/* Tooltip arrow */}
                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-surface-container-high border-r border-b border-outline-variant/30 rotate-45" />
                   </div>
@@ -297,40 +325,49 @@ export default function StaffProfileScreen() {
             )}
           </div>
           
-          <div className="space-y-3">
-            {historyData.length === 0 ? (
+          <div className="space-y-6">
+            {sortedMonths.length === 0 ? (
               <p className="text-sm text-secondary text-center py-4">لم يتم تقييم هذا الموظف بعد.</p>
             ) : (
-              historyData.slice(0, 5).map((evalItem) => (
-                <div 
-                  key={evalItem.id} 
-                  onClick={() => navigate(`/evaluations/${evalItem.id}`)}
-                  className="bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-primary/10 shadow-sm"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                      <Icon name="FileText" size={20} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-on-surface">أسبوع {evalItem.month_week_number}</p>
-                      <p className="text-[10px] text-secondary">{new Date(evalItem.week_start_date).toLocaleDateString('ar-SA')}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-on-surface">{evalItem.overall_score_percentage}/100</p>
-                      <p className="text-[10px] text-outline">مكتمل</p>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log("Downloading PDF for", evalItem.id);
-                      }}
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container text-secondary hover:bg-primary hover:text-white transition-all active:scale-90 shadow-sm border border-transparent hover:border-primary"
-                    >
-                      <Icon name="Download" size={16} />
-                    </button>
+              sortedMonths.map((month) => (
+                <div key={month} className="space-y-3">
+                  <h4 className="text-sm font-bold text-vertex-teal bg-surface-container-low px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                    الشهر {month}
+                  </h4>
+                  <div className="space-y-3">
+                    {groupedHistory[month].map((evalItem) => (
+                      <div 
+                        key={evalItem.id} 
+                        onClick={() => navigate(`/evaluations/${evalItem.id}`)}
+                        className="bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-primary/10 shadow-sm"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                            <Icon name="FileText" size={20} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-on-surface">أسبوع {evalItem.month_week_number}</p>
+                            <p className="text-[10px] text-secondary">{new Date(evalItem.week_start_date).toLocaleDateString('ar-SA')}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                          <div className="text-left">
+                            <p className="text-sm font-bold text-on-surface">{evalItem.overall_score_percentage}/100</p>
+                            <p className="text-[10px] text-outline">مكتمل</p>
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("Downloading PDF for", evalItem.id);
+                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container text-secondary hover:bg-primary hover:text-white transition-all active:scale-90 shadow-sm border border-transparent hover:border-primary"
+                          >
+                            <Icon name="Download" size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))

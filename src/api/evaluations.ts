@@ -131,7 +131,7 @@ export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, fis
     queryFn: async () => {
       const { data, error } = await supabase
         .from('discipline_evaluations')
-        .select('id, overall_score_percentage, month_week_number, week_start_date')
+        .select('id, overall_score_percentage, month_week_number, fiscal_month, week_start_date')
         .eq('staff_id', staffId)
         .eq('fiscal_year_label', fiscalYearLabel)
         .eq('status', 'submitted')
