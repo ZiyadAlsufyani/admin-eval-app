@@ -5,6 +5,7 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
 import { AppHeader } from '@/components/layout/AppHeader';
+import { Avatar } from '@/components/ui/Avatar';
 import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
 import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
 import { formatISODate } from '@/utils/date';
@@ -249,13 +250,6 @@ export default function EvaluationFormScreen() {
 
     setPendingUploads(prev => {
       const existingFiles = prev[categoryId] || [];
-      const currentAtts = attachmentsRef.current[categoryId] || [];
-      const currentDels = pendingDeletionsRef.current;
-      const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
-      if (finalTotal >= MAX_FILES_PER_CATEGORY) {
-        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
-        return prev;
-      }
       return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
     });
 
@@ -267,6 +261,7 @@ export default function EvaluationFormScreen() {
     const rawFile = target.files?.[0];
     const categoryId = localStorage.getItem('pendingUploadCategory');
     if (!rawFile || !categoryId) { target.value = ''; return; }
+
     await processFileForCategory(rawFile, categoryId, () => {
       target.value = '';
       localStorage.removeItem('pendingUploadCategory');
@@ -443,11 +438,18 @@ export default function EvaluationFormScreen() {
           <div className="flex items-center justify-between">
             <span className="bg-vertex-teal text-white px-3 py-1 rounded-full text-[10px] font-bold">نموذج التقييم الاسبوعي</span>
             <span className="text-xs font-semibold text-secondary">
-              {fiscalContext?.weekNumber ? `الأسبوع ${fiscalContext.weekNumber}` : 'الأسبوع الحالي'}
+              {fiscalContext?.currentMonth && fiscalContext?.weekNumber 
+                ? `تقييم الشهر ${fiscalContext.currentMonth} - الأسبوع ${fiscalContext.weekNumber}` 
+                : 'الأسبوع الحالي'}
             </span>
           </div>
           <div className="flex gap-4 items-center pt-2">
-            <img src={staff.avatarUrl || `https://ui-avatars.com/api/?name=${staff.name}&background=random`} alt={staff.name} className="w-16 h-16 rounded-xl object-cover shadow-sm bg-surface-container" />
+            <Avatar 
+              name={staff.name} 
+              imageUrl={staff.avatarUrl} 
+              size="lg" 
+              shape="square" 
+            />
             <div>
               <h2 className="text-lg font-bold text-foreground">{staff.name}</h2>
               <p className="text-sm font-medium text-secondary">{staff.subject || staff.role}</p>
