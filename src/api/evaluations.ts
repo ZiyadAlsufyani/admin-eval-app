@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export type EvaluationDetail = {
   category_name: string;
-  score: number;
+  score: number | null;
   justification_notes?: string;
   evidence_file_url?: string;
   attachments?: string[];
