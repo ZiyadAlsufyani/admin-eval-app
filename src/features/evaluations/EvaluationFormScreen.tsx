@@ -224,6 +224,9 @@ export default function EvaluationFormScreen() {
   const processFileForCategory = async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
     if (!profile || !staff) { cleanupCallback?.(); return; }
 
+    const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    
+    // 1. Early optimistic quantity check
     const currentAttachments = attachmentsRef.current[categoryId] || [];
     const currentPending = pendingUploadsRef.current[categoryId] || [];
     const currentPendingDeletions = pendingDeletionsRef.current;
@@ -237,19 +240,30 @@ export default function EvaluationFormScreen() {
       return;
     }
 
-    const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    // 2. Compress if image (allows 10MB native camera photos to be compressed down)
     const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
 
+    // 3. Strict size check on the FINAL (compressed) file
     if (file.size > MAX_SIZE_BYTES) {
-      alert(`حجم الملف كبير جداً. الحد الأقصى هو ${MAX_FILE_SIZE_MB} ميجابايت.`);
+      const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
+      alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
       cleanupCallback?.();
       return;
     }
-
     const preview = URL.createObjectURL(file);
 
+    // 4. Thread-safe strict quantity check
     setPendingUploads(prev => {
       const existingFiles = prev[categoryId] || [];
+      const currentAtts = attachmentsRef.current[categoryId] || [];
+      const currentDels = pendingDeletionsRef.current;
+      const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
+      
+      if (finalTotal >= MAX_FILES_PER_CATEGORY) {
+        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
+        return prev; // Do not append!
+      }
+      
       return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
     });
 
