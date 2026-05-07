@@ -18,6 +18,13 @@ interface EvaluationDraft {
   pendingUploads: Record<string, { file: File }[]>;
 }
 
+const QUESTIONS = [
+  { id: 'attendance', label: 'الحضور والانصراف' },
+  { id: 'duty', label: 'إشراف الأدوار' },
+  { id: 'break', label: 'إشراف الفسحة' },
+  { id: 'supervision', label: 'المناوبة' },
+];
+
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
@@ -45,6 +52,8 @@ export default function EvaluationFormScreen() {
   const [isIDBLoaded, setIsIDBLoaded] = useState(false);
   // Prevents the DB-hydration effect from overwriting IDB-restored state
   const isRestoredRef = useRef(false);
+  // Tracks if the user has actually made an edit to prevent saving phantom drafts
+  const hasEditedRef = useRef(false);
 
   // ---- Refs for access inside stable callbacks ----
   const attachmentsRef = useRef(attachments);
@@ -143,7 +152,8 @@ export default function EvaluationFormScreen() {
       notes.trim().length > 0 ||
       Object.values(pendingUploads).some(arr => arr.length > 0);
 
-    if (hasDraftContent) {
+    // Only write to IDB if the user has actively made an edit
+    if (hasDraftContent && hasEditedRef.current) {
       const storable: EvaluationDraft = {
         ratings,
         justifications,
@@ -178,40 +188,33 @@ export default function EvaluationFormScreen() {
     );
   }
 
-  const QUESTIONS = [
-    { id: 'attendance', label: 'الحضور والانصراف' },
-    { id: 'duty', label: 'إشراف الأدوار' },
-    { id: 'break', label: 'إشراف الفسحة' },
-    { id: 'supervision', label: 'المناوبة' },
-  ];
+  // Remove internal QUESTIONS definition
 
-  const handleRating = (questionId: string, score: number) => {
+  const handleRating = useCallback((questionId: string, score: number) => {
+    hasEditedRef.current = true;
     setRatings(prev => ({ ...prev, [questionId]: score }));
-  };
+  }, []);
 
-  const handleJustification = (questionId: string, text: string) => {
+  const handleJustification = useCallback((questionId: string, text: string) => {
+    hasEditedRef.current = true;
     setJustifications(prev => {
       if (text === '') {
-        // Prune the key so empty strings don't ghost hasDraftContent
         const { [questionId]: _, ...rest } = prev;
         return rest;
       }
       return { ...prev, [questionId]: text };
     });
-  };
+  }, []);
 
-  const processFileForCategory = async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
+  const processFileForCategory = useCallback(async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
     if (!profile || !staff) { cleanupCallback?.(); return; }
 
     const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
     
-    // 1. Early optimistic quantity check
     const currentAttachments = attachmentsRef.current[categoryId] || [];
     const currentPending = pendingUploadsRef.current[categoryId] || [];
     const currentPendingDeletions = pendingDeletionsRef.current;
-    const totalFiles =
-      currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length +
-      currentPending.length;
+    const totalFiles = currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + currentPending.length;
 
     if (totalFiles >= MAX_FILES_PER_CATEGORY) {
       alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
@@ -219,10 +222,8 @@ export default function EvaluationFormScreen() {
       return;
     }
 
-    // 2. Compress if image (allows 10MB native camera photos to be compressed down)
     const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
 
-    // 3. Strict size check on the FINAL (compressed) file
     if (file.size > MAX_SIZE_BYTES) {
       const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
       alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
@@ -231,7 +232,7 @@ export default function EvaluationFormScreen() {
     }
     const preview = URL.createObjectURL(file);
 
-    // 4. Thread-safe strict quantity check
+    hasEditedRef.current = true;
     setPendingUploads(prev => {
       const existingFiles = prev[categoryId] || [];
       const currentAtts = attachmentsRef.current[categoryId] || [];
@@ -240,14 +241,14 @@ export default function EvaluationFormScreen() {
       
       if (finalTotal >= MAX_FILES_PER_CATEGORY) {
         setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
-        return prev; // Do not append!
+        return prev;
       }
       
       return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
     });
 
     cleanupCallback?.();
-  };
+  }, [profile, staff]);
 
   const handleGlobalFileChange = useCallback(async (e: Event | { target: HTMLInputElement }) => {
     const target = e.target as HTMLInputElement;
@@ -259,7 +260,7 @@ export default function EvaluationFormScreen() {
       target.value = '';
       localStorage.removeItem('pendingUploadCategory');
     });
-  }, [profile, staff]);
+  }, [processFileForCategory]);
 
   // ---- Hook up the single global file listener ----
   useEffect(() => {
@@ -279,7 +280,8 @@ export default function EvaluationFormScreen() {
     globalInput?.click();
   };
 
-  const handleDeleteFile = (categoryId: string, pathOrPreview: string, isPending: boolean) => {
+  const handleDeleteFile = useCallback((categoryId: string, pathOrPreview: string, isPending: boolean) => {
+    hasEditedRef.current = true;
     if (isPending) {
       URL.revokeObjectURL(pathOrPreview);
       setPendingUploads(prev => ({
@@ -291,7 +293,7 @@ export default function EvaluationFormScreen() {
         setPendingDeletions(prev => [...prev, pathOrPreview]);
       }
     }
-  };
+  }, [pendingDeletions]);
 
   const buildPayload = (status: 'draft' | 'submitted', finalAttachments: Record<string, string[]>) => {
     if (!profile || !staff) return null;
@@ -575,7 +577,10 @@ export default function EvaluationFormScreen() {
             <textarea
               maxLength={1000}
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                hasEditedRef.current = true;
+                setNotes(e.target.value);
+              }}
               className="w-full min-h-[120px] p-4 bg-transparent border-none focus:ring-0 text-sm resize-none"
               placeholder="أدخل ملاحظات التقييم النوعي هنا..."
             />
