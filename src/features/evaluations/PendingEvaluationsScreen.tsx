@@ -2,18 +2,18 @@ import { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Icon } from '@/components/ui/icon';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
-import { getTermWeeks } from '@/utils/academicCalendar';
+import { getMonthWeeks } from '@/utils/academicCalendar';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
 
 export default function PendingEvaluationsScreen() {
-  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, academicContext, currentAcademicContext, holidays } = useOutletContext<StaffOutletContext>();
+  const { staffList, selectedEvaluationWeek, setSelectedEvaluationWeek, fiscalContext, currentFiscalContext, holidays } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const [isWeekPickerOpen, setIsWeekPickerOpen] = useState(false);
   
-  const recentWeeks = currentAcademicContext 
-    ? getTermWeeks(currentAcademicContext.activeTerm, currentAcademicContext.weekNumber, holidays)
-    : (academicContext ? getTermWeeks(academicContext.activeTerm, academicContext.weekNumber, holidays) : []);
+  const recentWeeks = currentFiscalContext 
+    ? getMonthWeeks(currentFiscalContext.currentMonth - 1, new Date().getFullYear(), holidays)
+    : (fiscalContext ? getMonthWeeks(fiscalContext.currentMonth - 1, selectedEvaluationWeek.getFullYear(), holidays) : []);
 
   // Stats calculation
   const totalPending = staffList.filter(s => s.status === 'معلق' || s.status === 'مسودة').length;
@@ -32,11 +32,11 @@ export default function PendingEvaluationsScreen() {
 
       <main className="px-6 pt-4 space-y-6">
         
-        {(!academicContext || academicContext.isHoliday) ? (
+        {(!fiscalContext || fiscalContext.isHoliday) ? (
           <div className="text-center p-8 mt-12 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
             <Icon name="Calendar" size={48} className="mx-auto text-outline-variant mb-4 opacity-50" />
             <p className="text-secondary font-medium text-lg">
-              {!academicContext ? "لا توجد تقييمات حالية. إجازة سعيدة!" : "هذا الأسبوع يوافق إجازة رسمية. إجازة سعيدة!"}
+              {!fiscalContext ? "لا توجد تقييمات حالية. إجازة سعيدة!" : "هذا الأسبوع يوافق إجازة رسمية. إجازة سعيدة!"}
             </p>
             {recentWeeks.length > 0 && (
               <button 
@@ -55,10 +55,10 @@ export default function PendingEvaluationsScreen() {
               <div className="bg-vertex-teal p-6 rounded-xl flex justify-between items-center overflow-hidden relative shadow-lg">
                 <div className="relative z-10 flex flex-col gap-1">
                   <p className="text-white/80 text-sm font-medium">
-                    {academicContext.activeTerm.academic_year} | {academicContext.activeTerm.name}
+                    {fiscalContext.activeFiscalYear.year_label} | الشهر {fiscalContext.currentMonth}
                   </p>
                   <h2 className="text-4xl font-extrabold text-white tracking-tight">
-                    الأسبوع {academicContext.weekNumber}
+                    الأسبوع {fiscalContext.weekNumber}
                   </h2>
                 </div>
                 <button 

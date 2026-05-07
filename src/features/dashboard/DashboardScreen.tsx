@@ -8,7 +8,7 @@ import { useCumulativePerformanceQuery } from '@/api/evaluations';
 import { AppHeader } from '@/components/layout/AppHeader';
 
 export default function DashboardScreen() {
-  const { staffList, academicContext } = useOutletContext<StaffOutletContext>();
+  const { staffList, fiscalContext } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -16,7 +16,7 @@ export default function DashboardScreen() {
   // Fetch cumulative staff averages from the database
   const { data: cumulativeData = {} } = useCumulativePerformanceQuery(
     profile?.school_id, 
-    academicContext?.activeTerm.academic_year
+    fiscalContext?.activeFiscalYear.year_label
   );
 
   // Derived Statistics from true database averages
@@ -79,14 +79,14 @@ export default function DashboardScreen() {
           </section>
         )}
 
-        {/* Academic Context Indicator */}
-        {academicContext && (
+        {/* Fiscal Context Indicator */}
+        {fiscalContext && (
           <section className="flex justify-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-surface-container-lowest rounded-full border border-surface-container shadow-sm">
               <Icon name="Calendar" size={16} className="text-vertex-teal" />
-              <span className="text-xs font-bold text-vertex-teal">{academicContext.activeTerm.academic_year}</span>
+              <span className="text-xs font-bold text-vertex-teal">{fiscalContext.activeFiscalYear.year_label}</span>
               <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
-              <span className="text-xs font-bold text-secondary">{academicContext.activeTerm.name}</span>
+              <span className="text-xs font-bold text-secondary">الشهر {fiscalContext.currentMonth}</span>
             </div>
           </section>
         )}

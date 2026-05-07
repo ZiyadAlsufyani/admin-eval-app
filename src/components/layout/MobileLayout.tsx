@@ -6,8 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { StaffMember } from '@/types/staff';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { getStartOfWeek, formatISODate } from '@/utils/date';
-import { useAcademicTermsQuery, useHolidaysQuery } from '@/api/academic';
-import { getAcademicContext, type AcademicContext, type Holiday } from '@/utils/academicCalendar';
+import { useFiscalYearsQuery, useHolidaysQuery } from '@/api/academic';
+import { getFiscalContext, type FiscalContext, type Holiday } from '@/utils/academicCalendar';
 import { PwaUpdateToast } from '@/components/ui/PwaUpdateToast';
 
 export type StaffOutletContext = {
@@ -15,8 +15,8 @@ export type StaffOutletContext = {
   updateStaffStatus: (id: string, updates: Partial<StaffMember>) => void;
   selectedEvaluationWeek: Date;
   setSelectedEvaluationWeek: (date: Date) => void;
-  academicContext: AcademicContext | null;
-  currentAcademicContext: AcademicContext | null;
+  fiscalContext: FiscalContext | null;
+  currentFiscalContext: FiscalContext | null;
   holidays: Holiday[];
 };
 
@@ -37,17 +37,17 @@ export function MobileLayout() {
   
   const isPrincipal = profile?.role === 'principal';
   
-  // Fetch terms, holidays, and calculate academic context
-  const { data: terms = [], isLoading: isTermsLoading } = useAcademicTermsQuery();
+  // Fetch fiscal years, holidays, and calculate fiscal context
+  const { data: fiscalYears = [], isLoading: isFiscalYearsLoading } = useFiscalYearsQuery();
   const { data: holidays = [], isLoading: isHolidaysLoading } = useHolidaysQuery();
   
-  const academicContext = getAcademicContext(selectedEvaluationWeek, terms, holidays);
-  const currentAcademicContext = getAcademicContext(new Date(), terms, holidays);
+  const fiscalContext = getFiscalContext(selectedEvaluationWeek, fiscalYears, holidays);
+  const currentFiscalContext = getFiscalContext(new Date(), fiscalYears, holidays);
 
   // Fetch real data via TanStack + Supabase
   const { data: staffList = [], isLoading: isStaffLoading } = useStaffQuery(selectedEvaluationWeek);
 
-  const isLoading = isTermsLoading || isHolidaysLoading || isStaffLoading;
+  const isLoading = isFiscalYearsLoading || isHolidaysLoading || isStaffLoading;
 
   // Create a bridging function that updates the TanStack cache directly 
   // (acting exactly like our old mock hook but for real data caching)
@@ -101,8 +101,8 @@ export function MobileLayout() {
         updateStaffStatus, 
         selectedEvaluationWeek, 
         setSelectedEvaluationWeek,
-        academicContext,
-        currentAcademicContext,
+        fiscalContext,
+        currentFiscalContext,
         holidays
       }} />
       <BottomNav

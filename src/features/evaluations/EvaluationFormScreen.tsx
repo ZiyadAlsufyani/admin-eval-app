@@ -20,7 +20,7 @@ interface EvaluationDraft {
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
-  const { staffList, updateStaffStatus, selectedEvaluationWeek, academicContext } = useOutletContext<StaffOutletContext>();
+  const { staffList, updateStaffStatus, selectedEvaluationWeek, fiscalContext } = useOutletContext<StaffOutletContext>();
   const { profile } = useAuth();
 
   const staff = staffList.find(s => s.id === staffId);
@@ -328,13 +328,14 @@ export default function EvaluationFormScreen() {
       school_id: profile.school_id,
       staff_id: staff.id,
       evaluator_id: profile.id,
-      academic_year: academicContext?.activeTerm.academic_year || '2024-2025',
+      fiscal_year_label: fiscalContext?.activeFiscalYear.year_label || '2024-2025',
       week_start_date: weekStartDateString,
       status,
       general_notes: notes,
       overall_score_percentage,
-      term_id: academicContext?.activeTerm.id,
-      academic_week_number: academicContext?.weekNumber,
+      fiscal_year_id: fiscalContext?.activeFiscalYear.id,
+      month_week_number: fiscalContext?.weekNumber,
+      fiscal_month: fiscalContext?.currentMonth,
       details,
     };
   };
@@ -442,7 +443,7 @@ export default function EvaluationFormScreen() {
           <div className="flex items-center justify-between">
             <span className="bg-vertex-teal text-white px-3 py-1 rounded-full text-[10px] font-bold">نموذج التقييم الاسبوعي</span>
             <span className="text-xs font-semibold text-secondary">
-              {academicContext?.weekNumber ? `الأسبوع ${academicContext.weekNumber}` : 'الأسبوع الحالي'}
+              {fiscalContext?.weekNumber ? `الأسبوع ${fiscalContext.weekNumber}` : 'الأسبوع الحالي'}
             </span>
           </div>
           <div className="flex gap-4 items-center pt-2">

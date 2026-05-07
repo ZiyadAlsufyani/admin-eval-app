@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { useStaffEvaluationsHistoryQuery } from '@/api/evaluations';
+import { useStaffEvaluationsHistoryQuery, useStaffPerformanceTrendQuery } from '@/api/evaluations';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { Icon } from '@/components/ui/icon';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -17,7 +17,7 @@ export default function StaffProfileScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { staffList, academicContext } = useOutletContext<StaffOutletContext>();
+  const { staffList, fiscalContext } = useOutletContext<StaffOutletContext>();
 
   const isPrincipal = profile?.role === 'principal';
   const effectiveStaffId = isPrincipal ? staffId : profile?.id;
@@ -36,7 +36,8 @@ export default function StaffProfileScreen() {
         }
       : undefined;
 
-  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, academicContext?.activeTerm?.academic_year);
+  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, fiscalContext?.activeFiscalYear?.year_label);
+  const { data: trendData } = useStaffPerformanceTrendQuery(effectiveStaffId);
   const [activePoint, setActivePoint] = useState<number | null>(null);
 
   if (!staff) {
@@ -79,7 +80,7 @@ export default function StaffProfileScreen() {
     const score = evalItem.overall_score_percentage || 0;
     const x = calculateX(i);
     const y = (CHART_HEIGHT - (score / 100) * CHART_HEIGHT) + TOP_PADDING;
-    return { x, y, score, week: `أسبوع ${evalItem.academic_week_number || '?'}` };
+    return { x, y, score, week: `أسبوع ${evalItem.month_week_number || '?'}` };
   });
 
   const pathStr = displayData.length === 1 
@@ -137,12 +138,45 @@ export default function StaffProfileScreen() {
           </div>
         </section>
 
+        {/* Performance Trend Feedback */}
+        {trendData && (
+          <section className={`p-4 rounded-xl flex items-center gap-4 shadow-sm border ${
+            trendData.trend === 'up' ? 'bg-green-50 border-green-100' :
+            trendData.trend === 'stable' ? 'bg-slate-50 border-slate-200' :
+            'bg-orange-50 border-orange-100'
+          }`}>
+            <div className={`p-3 rounded-full shrink-0 ${
+              trendData.trend === 'up' ? 'bg-green-100 text-green-600' :
+              trendData.trend === 'stable' ? 'bg-slate-200 text-slate-600' :
+              'bg-orange-100 text-orange-600'
+            }`}>
+              <Icon name={trendData.trend === 'up' ? 'TrendingUp' : trendData.trend === 'stable' ? 'Minus' : 'TrendingDown'} size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className={`text-sm font-bold mb-0.5 ${
+                trendData.trend === 'up' ? 'text-green-800' :
+                trendData.trend === 'stable' ? 'text-slate-800' :
+                'text-orange-800'
+              }`}>مؤشر الأداء</h3>
+              <p className={`text-xs font-medium leading-relaxed ${
+                trendData.trend === 'up' ? 'text-green-700' :
+                trendData.trend === 'stable' ? 'text-slate-600' :
+                'text-orange-700'
+              }`}>
+                {trendData.trend === 'up' ? 'أداؤك أعلى من الشهر السابق، استمر في هذا التميز!' :
+                 trendData.trend === 'stable' ? 'أداؤك مستقر وممتاز، حافظ على هذا المستوى!' :
+                 'لاحظنا تراجعاً بسيطاً هذا الشهر، نحن نثق بقدراتك للعودة أقوى!'}
+              </p>
+            </div>
+          </section>
+        )}
+
         {/* Performance Chart Section */}
         <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_20px_rgba(11,28,48,0.04)]">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-bold text-on-surface font-headline">اتجاه الأداء</h3>
             <span className="text-[10px] text-secondary font-medium px-2 py-1 bg-surface-container rounded-lg">
-              السنة الدراسية - {academicContext?.activeTerm.academic_year}
+              السنة المالية - {fiscalContext?.activeFiscalYear.year_label}
             </span>
           </div>
           
@@ -278,7 +312,7 @@ export default function StaffProfileScreen() {
                       <Icon name="FileText" size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-on-surface">أسبوع {evalItem.academic_week_number}</p>
+                      <p className="text-sm font-bold text-on-surface">أسبوع {evalItem.month_week_number}</p>
                       <p className="text-[10px] text-secondary">{new Date(evalItem.week_start_date).toLocaleDateString('ar-SA')}</p>
                     </div>
                   </div>

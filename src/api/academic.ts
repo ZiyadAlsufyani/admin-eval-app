@@ -1,22 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { AcademicTerm, Holiday } from '@/utils/academicCalendar';
+import type { FiscalYear, Holiday } from '@/utils/academicCalendar';
 
-export const useAcademicTermsQuery = () => {
+export const useFiscalYearsQuery = () => {
   return useQuery({
-    queryKey: ['academicTerms'],
-    queryFn: async (): Promise<AcademicTerm[]> => {
+    queryKey: ['fiscalYears'],
+    queryFn: async (): Promise<FiscalYear[]> => {
       const { data, error } = await supabase
-        .from('academic_terms')
+        .from('fiscal_years')
         .select('*')
         .order('start_date', { ascending: true });
 
       if (error) {
-        console.error('Error fetching academic terms:', error);
+        console.error('Error fetching fiscal years:', error);
         throw error;
       }
 
-      return data as AcademicTerm[];
+      return data as FiscalYear[];
     },
     staleTime: 1000 * 60 * 60 * 24, // Cache for 24 hours
   });

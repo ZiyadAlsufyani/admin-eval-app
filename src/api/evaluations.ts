@@ -13,13 +13,14 @@ export type SaveEvaluationPayload = {
   school_id: string;
   staff_id: string;
   evaluator_id: string;
-  academic_year: string;
+  fiscal_year_label: string;
   week_start_date: string; // YYYY-MM-DD
   status: 'draft' | 'submitted';
   general_notes?: string;
   overall_score_percentage?: number;
-  term_id?: string;
-  academic_week_number?: number;
+  fiscal_year_id?: string;
+  month_week_number?: number;
+  fiscal_month?: number;
   details: EvaluationDetail[];
 };
 
@@ -64,13 +65,14 @@ export function useSaveEvaluationMutation() {
         p_school_id: payload.school_id,
         p_staff_id: payload.staff_id,
         p_evaluator_id: payload.evaluator_id,
-        p_academic_year: payload.academic_year,
+        p_fiscal_year_label: payload.fiscal_year_label,
         p_week_start_date: payload.week_start_date,
         p_status: payload.status,
         p_general_notes: payload.general_notes || null,
         p_overall_score_percentage: payload.overall_score_percentage || null,
-        p_term_id: payload.term_id || null,
-        p_academic_week_number: payload.academic_week_number || null,
+        p_fiscal_year_id: payload.fiscal_year_id || null,
+        p_month_week_number: payload.month_week_number || null,
+        p_fiscal_month: payload.fiscal_month || null,
         p_details: payload.details,
       });
 
@@ -91,18 +93,18 @@ export function useSaveEvaluationMutation() {
       });
       // Invalidate cumulative performance
       queryClient.invalidateQueries({
-        queryKey: ['cumulative_performance', variables.school_id, variables.academic_year],
+        queryKey: ['cumulative_performance', variables.school_id, variables.fiscal_year_label],
       });
     },
   });
 }
 
-export function useCumulativePerformanceQuery(schoolId: string | undefined, academicYear: string | undefined) {
+export function useCumulativePerformanceQuery(schoolId: string | undefined, fiscalYearLabel: string | undefined) {
   return useQuery({
-    queryKey: ['cumulative_performance', schoolId, academicYear],
+    queryKey: ['cumulative_performance', schoolId, fiscalYearLabel],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_cumulative_staff_averages', {
-        p_academic_year: academicYear,
+        p_fiscal_year_label: fiscalYearLabel,
         p_school_id: schoolId,
       });
 
@@ -119,19 +121,19 @@ export function useCumulativePerformanceQuery(schoolId: string | undefined, acad
       
       return performanceMap;
     },
-    enabled: !!schoolId && !!academicYear,
+    enabled: !!schoolId && !!fiscalYearLabel,
   });
 }
 
-export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, academicYear: string | undefined) {
+export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, fiscalYearLabel: string | undefined) {
   return useQuery({
-    queryKey: ['evaluations_history', staffId, academicYear],
+    queryKey: ['evaluations_history', staffId, fiscalYearLabel],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('discipline_evaluations')
-        .select('id, overall_score_percentage, academic_week_number, week_start_date')
+        .select('id, overall_score_percentage, month_week_number, week_start_date')
         .eq('staff_id', staffId)
-        .eq('academic_year', academicYear)
+        .eq('fiscal_year_label', fiscalYearLabel)
         .eq('status', 'submitted')
         .order('week_start_date', { ascending: false });
 
@@ -142,7 +144,7 @@ export function useStaffEvaluationsHistoryQuery(staffId: string | undefined, aca
 
       return data || [];
     },
-    enabled: !!staffId && !!academicYear,
+    enabled: !!staffId && !!fiscalYearLabel,
   });
 }
 
@@ -182,5 +184,38 @@ export function useEvaluationDetailQuery(evaluationId: string | undefined) {
       };
     },
     enabled: !!evaluationId,
+  });
+}
+
+export function useServerDateContextQuery() {
+  return useQuery({
+    queryKey: ['server_date_context'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_server_date_context');
+      if (error) {
+        console.error("Error fetching server date context:", error);
+        throw error;
+      }
+      return data as { server_date: string; current_month: number; fiscal_year_label: string; };
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  });
+}
+
+export function useStaffPerformanceTrendQuery(staffId: string | undefined) {
+  return useQuery({
+    queryKey: ['staff_performance_trend', staffId],
+    queryFn: async () => {
+      if (!staffId) return null;
+      const { data, error } = await supabase.rpc('get_staff_performance_trend', {
+        p_staff_id: staffId,
+      });
+      if (error) {
+        console.error("Error fetching staff performance trend:", error);
+        throw error;
+      }
+      return data as { current_score: number; previous_score: number; trend: 'up' | 'down' | 'stable'; };
+    },
+    enabled: !!staffId,
   });
 }
