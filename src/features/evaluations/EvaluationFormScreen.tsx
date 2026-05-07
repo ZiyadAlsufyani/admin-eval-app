@@ -97,8 +97,25 @@ export default function EvaluationFormScreen() {
       existingEvaluation.details.forEach((detail: any) => {
         newRatings[detail.category_name] = detail.score;
         if (detail.justification_notes) newJustifs[detail.category_name] = detail.justification_notes;
-        if (detail.attachments && Array.isArray(detail.attachments)) {
-          newAttachments[detail.category_name] = [...detail.attachments];
+        
+        let parsedAttachments: string[] = [];
+        if (detail.attachments) {
+          if (Array.isArray(detail.attachments)) {
+            parsedAttachments = [...detail.attachments];
+          } else if (typeof detail.attachments === 'string') {
+            try {
+              const parsed = JSON.parse(detail.attachments);
+              if (Array.isArray(parsed)) parsedAttachments = [...parsed];
+            } catch (e) {
+              console.error('Failed to parse attachments JSON string', e);
+            }
+          }
+        } else if (detail.evidence_file_url) {
+          parsedAttachments = [detail.evidence_file_url];
+        }
+
+        if (parsedAttachments.length > 0) {
+          newAttachments[detail.category_name] = parsedAttachments;
         }
       });
       setNotes(existingEvaluation.general_notes || '');
@@ -273,12 +290,13 @@ export default function EvaluationFormScreen() {
   const buildPayload = (status: 'draft' | 'submitted', finalAttachments: Record<string, string[]>) => {
     if (!profile || !staff) return null;
 
-    // Skip unanswered questions — DB CHECK constraint requires score >= 1.
+    // Include questions that have a score, or have attachments, or have notes.
+    // NOTE: This requires the DB 'score' column to allow NULL values for drafts.
     const details = QUESTIONS
-      .filter(q => !!ratings[q.id])
+      .filter(q => !!ratings[q.id] || (finalAttachments[q.id] && finalAttachments[q.id].length > 0) || !!justifications[q.id])
       .map(q => ({
         category_name: q.id,
-        score: ratings[q.id],
+        score: ratings[q.id] || null,
         justification_notes: justifications[q.id] || '',
         attachments: finalAttachments[q.id] || [],
       }));
