@@ -5,12 +5,17 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './components/auth/AuthProvider'
 import { get, set } from 'idb-keyval'
+import { compressImageIfNeeded, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from './api/storage'
 
 // --- ANDROID OOM PRE-BOOT INTERCEPTOR ---
 // Catches file picker selections before React has mounted its event listeners.
 const globalInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
 if (globalInput) {
   globalInput.addEventListener('change', async (e) => {
+    // If the React component is actively mounted (e.g. on Windows or iOS where the app isn't killed),
+    // skip the interceptor so we don't double-process the file.
+    if ((window as any).isEvaluationFormMounted) return;
+
     const target = e.target as HTMLInputElement;
     const rawFile = target.files?.[0];
     const categoryId = localStorage.getItem('pendingUploadCategory');
@@ -23,7 +28,24 @@ if (globalInput) {
         // Safety: migrate old drafts that lacked the pendingUploads wrapper
         if (!existingData.pendingUploads) existingData.pendingUploads = {};
         const categoryFiles = existingData.pendingUploads[categoryId] || [];
-        categoryFiles.push({ file: rawFile });
+        
+        if (categoryFiles.length >= MAX_FILES_PER_CATEGORY) {
+          alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
+          target.value = '';
+          return;
+        }
+
+        const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+        const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
+
+        if (file.size > MAX_SIZE_BYTES) {
+          const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
+          alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
+          target.value = '';
+          return;
+        }
+
+        categoryFiles.push({ file });
         existingData.pendingUploads[categoryId] = categoryFiles;
         await set(idbKey, existingData);
         localStorage.removeItem('pendingUploadCategory');

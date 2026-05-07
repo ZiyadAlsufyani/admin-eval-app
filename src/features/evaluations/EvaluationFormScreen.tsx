@@ -6,7 +6,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
-import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
+import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, compressImageIfNeeded, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
 import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
 import { formatISODate } from '@/utils/date';
 
@@ -53,6 +53,12 @@ export default function EvaluationFormScreen() {
   useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
   useEffect(() => { pendingUploadsRef.current = pendingUploads; }, [pendingUploads]);
   useEffect(() => { pendingDeletionsRef.current = pendingDeletions; }, [pendingDeletions]);
+
+  // Tell main.tsx interceptor that the React component is actively handling events
+  useEffect(() => {
+    (window as any).isEvaluationFormMounted = true;
+    return () => { (window as any).isEvaluationFormMounted = false; };
+  }, []);
 
   // ---- Phase 1: Load IDB draft on mount ----
   useEffect(() => {
@@ -168,56 +174,6 @@ export default function EvaluationFormScreen() {
         return rest;
       }
       return { ...prev, [questionId]: text };
-    });
-  };
-
-  /**
-   * Compresses an image file via canvas to fit within the size limit.
-   * Non-image files are returned as-is.
-   */
-  const compressImageIfNeeded = (file: File, maxBytes: number): Promise<File> => {
-    if (!file.type.startsWith('image/') || file.size <= maxBytes) {
-      return Promise.resolve(file);
-    }
-
-    return new Promise(resolve => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        const MAX_DIM = 1920;
-        let { width, height } = img;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d')!;
-        try {
-          ctx.drawImage(img, 0, 0, width, height);
-        } catch {
-          resolve(file);
-          return;
-        }
-        canvas.toBlob(blob => {
-          if (blob && blob.size <= maxBytes) {
-            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
-          } else {
-            canvas.toBlob(blob2 => {
-              resolve(blob2
-                ? new File([blob2], file.name, { type: 'image/jpeg', lastModified: Date.now() })
-                : file);
-            }, 'image/jpeg', 0.6);
-          }
-        }, 'image/jpeg', 0.85);
-      };
-
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
-      img.src = objectUrl;
     });
   };
 
