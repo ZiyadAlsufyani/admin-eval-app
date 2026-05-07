@@ -86,42 +86,48 @@ export default function EvaluationFormScreen() {
     });
   }, [idbKey]);
 
-  // ---- Phase 2: Hydrate from DB evaluation (only if no IDB draft) ----
+  // ---- Phase 2: Hydrate from DB evaluation ----
   useEffect(() => {
-    if (isRestoredRef.current) return;
+    if (!existingEvaluation) return;
 
-    if (existingEvaluation) {
+    // 1. ALWAYS hydrate attachments from DB because they are never stored in IDB
+    const newAttachments: Record<string, string[]> = {};
+    existingEvaluation.details.forEach((detail: any) => {
+      let parsedAttachments: string[] = [];
+      if (detail.attachments) {
+        if (Array.isArray(detail.attachments)) {
+          parsedAttachments = [...detail.attachments];
+        } else if (typeof detail.attachments === 'string') {
+          try {
+            const parsed = JSON.parse(detail.attachments);
+            if (Array.isArray(parsed)) parsedAttachments = [...parsed];
+          } catch (e) {
+            console.error('Failed to parse attachments JSON string', e);
+          }
+        }
+      } else if (detail.evidence_file_url) {
+        parsedAttachments = [detail.evidence_file_url];
+      }
+
+      if (parsedAttachments.length > 0) {
+        newAttachments[detail.category_name] = parsedAttachments;
+      }
+    });
+    setAttachments(newAttachments);
+
+    // 2. ONLY hydrate mutable draft state if we haven't already restored an active IDB draft
+    if (!isRestoredRef.current) {
       const newRatings: Record<string, number> = {};
       const newJustifs: Record<string, string> = {};
-      const newAttachments: Record<string, string[]> = {};
+      
       existingEvaluation.details.forEach((detail: any) => {
-        newRatings[detail.category_name] = detail.score;
+        if (detail.score) newRatings[detail.category_name] = detail.score;
         if (detail.justification_notes) newJustifs[detail.category_name] = detail.justification_notes;
-        
-        let parsedAttachments: string[] = [];
-        if (detail.attachments) {
-          if (Array.isArray(detail.attachments)) {
-            parsedAttachments = [...detail.attachments];
-          } else if (typeof detail.attachments === 'string') {
-            try {
-              const parsed = JSON.parse(detail.attachments);
-              if (Array.isArray(parsed)) parsedAttachments = [...parsed];
-            } catch (e) {
-              console.error('Failed to parse attachments JSON string', e);
-            }
-          }
-        } else if (detail.evidence_file_url) {
-          parsedAttachments = [detail.evidence_file_url];
-        }
-
-        if (parsedAttachments.length > 0) {
-          newAttachments[detail.category_name] = parsedAttachments;
-        }
       });
+      
       setNotes(existingEvaluation.general_notes || '');
       setRatings(newRatings);
       setJustifications(newJustifs);
-      setAttachments(newAttachments);
       setPendingUploads({});
       setPendingDeletions([]);
     }
