@@ -39,24 +39,21 @@ export default function StaffPortfolioScreen() {
   const { profile } = useAuth();
   const { fiscalContext } = useOutletContext<StaffOutletContext>();
   
-  // Queries & Mutations
-  const { data: dbAchievements } = usePortfolioQuery(
-    profile?.id,
-    fiscalContext?.activeFiscalYear.year_label,
-    fiscalContext?.currentMonth
-  );
   const { mutateAsync: savePortfolio } = useSavePortfolioMutation();
 
   const [isProfDevOpen, setIsProfDevOpen] = useState(true);
   const [isCertificatesOpen, setIsCertificatesOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [profDevEntries, setProfDevEntries] = useState<ProfDevEntry[]>([]);
-  const [certificateEntries, setCertificateEntries] = useState<CertificateEntry[]>([]);
+  const [profDevEntries, setProfDevEntries] = useState<ProfDevEntry[]>([
+    { id: crypto.randomUUID(), name: '', role: '', hours: '' }
+  ]);
+  const [certificateEntries, setCertificateEntries] = useState<CertificateEntry[]>([
+    { id: crypto.randomUUID(), name: '' }
+  ]);
 
   const [isIDBLoaded, setIsIDBLoaded] = useState(false);
   const hasEditedRef = useRef(false);
-  const isRestoredRef = useRef(false);
 
   const idbKey = profile && fiscalContext
     ? `portfolio_draft_${profile.id}_${fiscalContext.activeFiscalYear.year_label}_${fiscalContext.currentMonth}`
@@ -82,45 +79,10 @@ export default function StaffPortfolioScreen() {
         });
         setProfDevEntries(draft.profDevEntries);
         setCertificateEntries(draft.certificateEntries);
-        isRestoredRef.current = true;
       }
       setIsIDBLoaded(true);
     }).catch(console.error);
   }, [idbKey, isIDBLoaded]);
-
-  // Phase 2: Hydrate from DB
-  useEffect(() => {
-    if (dbAchievements && isIDBLoaded) {
-      if (isRestoredRef.current) return; // Don't overwrite local draft if exists
-
-      const pd: ProfDevEntry[] = [];
-      const certs: CertificateEntry[] = [];
-
-      dbAchievements.forEach(ach => {
-        if (ach.type === 'course') {
-          pd.push({
-            id: ach.id!,
-            name: ach.title,
-            role: (ach.role as 'منفذ' | 'مستفيد' | '') || '',
-            hours: ach.hours || '',
-            document_url: ach.document_url,
-          });
-        } else {
-          certs.push({
-            id: ach.id!,
-            name: ach.title,
-            document_url: ach.document_url,
-          });
-        }
-      });
-
-      if (pd.length === 0) pd.push({ id: crypto.randomUUID(), name: '', role: '', hours: '' });
-      if (certs.length === 0) certs.push({ id: crypto.randomUUID(), name: '' });
-
-      setProfDevEntries(pd);
-      setCertificateEntries(certs);
-    }
-  }, [dbAchievements, isIDBLoaded]);
 
   // Phase 3: Save to IDB
   useEffect(() => {
@@ -249,12 +211,27 @@ export default function StaffPortfolioScreen() {
     if (!profile || !profile.school_id || !fiscalContext) return;
     
     // Filter out completely empty entries
-    const validProfDev = profDevEntries.filter(e => e.name.trim() !== '');
-    const validCerts = certificateEntries.filter(e => e.name.trim() !== '');
+    const validProfDev = profDevEntries.filter(e => e.name.trim() !== '' || e.role !== '' || e.hours !== '' || e.pendingFile || e.document_url);
+    const validCerts = certificateEntries.filter(e => e.name.trim() !== '' || e.pendingFile || e.document_url);
 
     if (validProfDev.length === 0 && validCerts.length === 0) {
-      alert("الرجاء إضافة بيانات للحفظ");
+      alert("الرجاء تعبئة دورة أو شهادة واحدة على الأقل");
       return;
+    }
+
+    // Validation Check
+    for (const e of validProfDev) {
+      if (!e.name.trim() || !e.role || !e.hours || !(e.pendingFile || e.document_url)) {
+        alert("الرجاء إكمال جميع الحقول وإرفاق المشهد لكل دورة تدريبية");
+        return;
+      }
+    }
+
+    for (const e of validCerts) {
+      if (!e.name.trim() || !(e.pendingFile || e.document_url)) {
+        alert("الرجاء إكمال اسم الشهادة وإرفاق الملف لكل شهادة شكر");
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -301,13 +278,15 @@ export default function StaffPortfolioScreen() {
 
       await savePortfolio(dbAchievementsPayload);
       
+      // Reset states
+      setProfDevEntries([{ id: crypto.randomUUID(), name: '', role: '', hours: '' }]);
+      setCertificateEntries([{ id: crypto.randomUUID(), name: '' }]);
+      hasEditedRef.current = false;
+      
       // Clean up IDB
       if (idbKey) await idbDel(idbKey);
-      hasEditedRef.current = false;
-      isRestoredRef.current = false;
       
-      alert("تم الحفظ بنجاح!");
-      navigate(-1);
+      alert("تم رفع الملفات بنجاح");
     } catch (err) {
       console.error(err);
       alert("حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.");
@@ -352,65 +331,84 @@ export default function StaffPortfolioScreen() {
 
           {isProfDevOpen && (
             <div className="p-5 border-t border-surface-container bg-surface-container-lowest/50 space-y-4">
-              {profDevEntries.map((entry, index) => (
+              {profDevEntries.map((entry, index) => {
+                const isEntryActive = entry.name.trim() !== '' || entry.role !== '' || entry.hours !== '' || !!entry.pendingFile || !!entry.document_url;
+                const isNameMissing = isEntryActive && entry.name.trim() === '';
+                const isRoleMissing = isEntryActive && entry.role === '';
+                const isHoursMissing = isEntryActive && entry.hours === '';
+                const isFileMissing = isEntryActive && !entry.pendingFile && !entry.document_url;
+
+                return (
                 <div key={entry.id} className="bg-white p-4 rounded-xl border border-surface-container shadow-sm space-y-3 relative">
                   <div className="absolute top-3 right-3 text-xs font-bold text-outline">
                     دورة #{index + 1}
                   </div>
                   
                   <div className="pt-4">
-                    <label className="block text-xs font-bold text-secondary mb-1">اسم الدورة</label>
+                    <label className="block text-xs font-bold text-secondary mb-1">
+                      اسم الدورة {isNameMissing && <span className="text-error mr-1">*</span>}
+                    </label>
                     <input 
                       type="text" 
                       value={entry.name}
                       onChange={(e) => updateProfDevEntry(entry.id, 'name', e.target.value)}
                       placeholder="أدخل اسم الدورة التدريبية"
-                      className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                      className={`w-full bg-surface-container-low border ${isNameMissing ? 'border-error/50 focus:border-error focus:ring-error' : 'border-outline-variant/30 focus:border-primary focus:ring-primary'} rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 transition-all`}
                     />
+                    {isNameMissing && <p className="text-[10px] text-error mt-1">هذا الحقل مطلوب</p>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-secondary mb-1">الدور</label>
+                      <label className="block text-xs font-bold text-secondary mb-1">
+                        الدور {isRoleMissing && <span className="text-error mr-1">*</span>}
+                      </label>
                       <select
                         value={entry.role}
                         onChange={(e) => updateProfDevEntry(entry.id, 'role', e.target.value)}
-                        className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
+                        className={`w-full bg-surface-container-low border ${isRoleMissing ? 'border-error/50 focus:border-error focus:ring-error' : 'border-outline-variant/30 focus:border-primary focus:ring-primary'} rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 transition-all appearance-none`}
                       >
-                        <option value="" disabled>اختر الدور</option>
+                        <option value="">بدون تحديد</option>
                         <option value="منفذ">منفذ</option>
                         <option value="مستفيد">مستفيد</option>
                       </select>
+                      {isRoleMissing && <p className="text-[10px] text-error mt-1">هذا الحقل مطلوب</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-secondary mb-1">عدد الساعات</label>
+                      <label className="block text-xs font-bold text-secondary mb-1">
+                        عدد الساعات {isHoursMissing && <span className="text-error mr-1">*</span>}
+                      </label>
                       <input 
                         type="number" 
                         value={entry.hours}
                         onChange={(e) => updateProfDevEntry(entry.id, 'hours', e.target.value ? Number(e.target.value) : '')}
                         placeholder="الساعات"
-                        className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                        className={`w-full bg-surface-container-low border ${isHoursMissing ? 'border-error/50 focus:border-error focus:ring-error' : 'border-outline-variant/30 focus:border-primary focus:ring-primary'} rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 transition-all`}
                       />
+                      {isHoursMissing && <p className="text-[10px] text-error mt-1">هذا الحقل مطلوب</p>}
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-outline-variant/20 flex justify-end">
+                  <div className={`pt-2 flex flex-col items-end border-t ${isFileMissing ? 'border-error/30' : 'border-outline-variant/20'}`}>
                     {entry.pendingFile || entry.document_url ? (
-                       <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-2 mt-2">
                           <span className="text-xs text-primary font-bold">تم إرفاق المشهد</span>
                           <button onClick={() => handleDeleteFile('course', entry.id, !!entry.pendingFile)} className="text-error p-1 bg-error/10 rounded-full">
                             <Icon name="Trash2" size={14} />
                           </button>
                        </div>
                     ) : (
-                      <button onClick={() => triggerFileInput('course', entry.id)} className="flex items-center gap-2 text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-lg transition-colors">
-                        <Icon name="Paperclip" size={16} />
-                        <span>إرفاق المشهد</span>
-                      </button>
+                      <div className="flex flex-col items-end gap-1 mt-2">
+                        <button onClick={() => triggerFileInput('course', entry.id)} className={`flex items-center gap-2 text-xs font-bold ${isFileMissing ? 'text-error bg-error/5 hover:bg-error/10' : 'text-primary bg-primary/5 hover:bg-primary/10'} px-4 py-2 rounded-lg transition-colors`}>
+                          <Icon name="Paperclip" size={16} />
+                          <span>إرفاق المشهد {isFileMissing && '*'}</span>
+                        </button>
+                        {isFileMissing && <p className="text-[10px] text-error font-bold">إرفاق المشهد مطلوب</p>}
+                      </div>
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
 
               {/* Add New Button */}
               {profDevEntries.length < MAX_ENTRIES && (
@@ -449,40 +447,51 @@ export default function StaffPortfolioScreen() {
 
           {isCertificatesOpen && (
             <div className="p-5 border-t border-surface-container bg-surface-container-lowest/50 space-y-4">
-              {certificateEntries.map((entry, index) => (
+              {certificateEntries.map((entry, index) => {
+                const isEntryActive = entry.name.trim() !== '' || !!entry.pendingFile || !!entry.document_url;
+                const isNameMissing = isEntryActive && entry.name.trim() === '';
+                const isFileMissing = isEntryActive && !entry.pendingFile && !entry.document_url;
+
+                return (
                 <div key={entry.id} className="bg-white p-4 rounded-xl border border-surface-container shadow-sm space-y-3 relative">
                   <div className="absolute top-3 right-3 text-xs font-bold text-outline">
                     شهادة #{index + 1}
                   </div>
                   
                   <div className="pt-4">
-                    <label className="block text-xs font-bold text-secondary mb-1">اسم الشهادة / موضوعها</label>
+                    <label className="block text-xs font-bold text-secondary mb-1">
+                      اسم الشهادة / موضوعها {isNameMissing && <span className="text-error mr-1">*</span>}
+                    </label>
                     <input 
                       type="text" 
                       value={entry.name}
                       onChange={(e) => updateCertificateEntry(entry.id, 'name', e.target.value)}
                       placeholder="أدخل موضوع الشهادة"
-                      className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
+                      className={`w-full bg-surface-container-low border ${isNameMissing ? 'border-error/50 focus:border-error focus:ring-error' : 'border-outline-variant/30 focus:border-orange-500 focus:ring-orange-500'} rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 transition-all`}
                     />
+                    {isNameMissing && <p className="text-[10px] text-error mt-1">هذا الحقل مطلوب</p>}
                   </div>
 
-                  <div className="pt-2 border-t border-outline-variant/20 flex justify-end">
+                  <div className={`pt-2 flex flex-col items-end border-t ${isFileMissing ? 'border-error/30' : 'border-outline-variant/20'}`}>
                     {entry.pendingFile || entry.document_url ? (
-                       <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-2 mt-2">
                           <span className="text-xs text-orange-500 font-bold">تم إرفاق الشهادة</span>
                           <button onClick={() => handleDeleteFile('certificate', entry.id, !!entry.pendingFile)} className="text-error p-1 bg-error/10 rounded-full">
                             <Icon name="Trash2" size={14} />
                           </button>
                        </div>
                     ) : (
-                      <button onClick={() => triggerFileInput('certificate', entry.id)} className="flex items-center gap-2 text-xs font-bold text-orange-500 bg-orange-500/5 hover:bg-orange-500/10 px-4 py-2 rounded-lg transition-colors">
-                        <Icon name="Paperclip" size={16} />
-                        <span>إرفاق الشهادة</span>
-                      </button>
+                      <div className="flex flex-col items-end gap-1 mt-2">
+                        <button onClick={() => triggerFileInput('certificate', entry.id)} className={`flex items-center gap-2 text-xs font-bold ${isFileMissing ? 'text-error bg-error/5 hover:bg-error/10' : 'text-orange-500 bg-orange-500/5 hover:bg-orange-500/10'} px-4 py-2 rounded-lg transition-colors`}>
+                          <Icon name="Paperclip" size={16} />
+                          <span>إرفاق الشهادة {isFileMissing && '*'}</span>
+                        </button>
+                        {isFileMissing && <p className="text-[10px] text-error font-bold">إرفاق الشهادة مطلوب</p>}
+                      </div>
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
 
               {/* Add New Button */}
               {certificateEntries.length < MAX_ENTRIES && (
@@ -505,16 +514,11 @@ export default function StaffPortfolioScreen() {
           <button 
             onClick={handleSave}
             disabled={isSaving}
-            className="w-full bg-primary text-on-primary py-4 rounded-xl font-bold text-base shadow-lg hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full py-4 flex items-center justify-center gap-2 bg-vertex-teal text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50"
           >
             {isSaving ? (
-              <>
-                <div className="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
-                <span>جاري الحفظ...</span>
-              </>
-            ) : (
-              <span>حفظ التغييرات</span>
-            )}
+              <><Icon name="Loader2" size={20} className="animate-spin" /> جاري الرفع...</>
+            ) : 'رفع المرفقات'}
           </button>
         </div>
       </main>

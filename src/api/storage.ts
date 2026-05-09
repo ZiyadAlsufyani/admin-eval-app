@@ -100,7 +100,7 @@ export async function uploadPortfolioDocument(
   const filePath = `${schoolId}/${staffId}/portfolio/${type}/${entryId}/${fileName}`;
 
   const { data, error } = await supabase.storage
-    .from('evaluation_evidence')
+    .from('portfolio_documents')
     .upload(filePath, file, {
       cacheControl: '3600',
       upsert: false
