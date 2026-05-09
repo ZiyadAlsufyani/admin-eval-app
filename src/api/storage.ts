@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 export const MAX_FILE_SIZE_MB = 5;
 export const MAX_FILES_PER_CATEGORY = 2;
+export const MAX_PORTFOLIO_FILES_PER_ENTRY = 1;
 
 /**
  * Uploads an evidence document to the evaluation_evidence bucket.
@@ -60,6 +61,53 @@ export async function uploadEvaluationEvidence(
 
   if (error) {
     console.error('Error uploading evidence:', error);
+    throw error;
+  }
+
+  return data.path;
+}
+
+/**
+ * Uploads a document to the evaluation_evidence bucket for the staff portfolio.
+ * 
+ * @param file The file to upload.
+ * @param schoolId The ID of the school.
+ * @param staffId The ID of the staff member.
+ * @param type The type of entry ('course' or 'certificate').
+ * @param entryId The unique ID of the entry.
+ * @returns The storage path of the uploaded file.
+ */
+export async function uploadPortfolioDocument(
+  file: File,
+  schoolId: string,
+  staffId: string,
+  type: string,
+  entryId: string
+): Promise<string> {
+  const dotIndex = file.name.lastIndexOf('.');
+  const nameExt =
+    dotIndex > 0 && dotIndex < file.name.length - 1
+      ? file.name.slice(dotIndex + 1)
+      : '';
+  const fileExt =
+    nameExt ||
+    MIME_TO_EXT[file.type] ||
+    (file.type.split('/')[1]?.split('+')[0] ?? 'bin');
+  
+  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+  
+  // Use the corrected path pattern
+  const filePath = `${schoolId}/${staffId}/portfolio/${type}/${entryId}/${fileName}`;
+
+  const { data, error } = await supabase.storage
+    .from('evaluation_evidence')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (error) {
+    console.error('Error uploading portfolio document:', error);
     throw error;
   }
 
