@@ -77,13 +77,35 @@ if (globalInput) {
         const existingData = (await get(portfolioIdbKey)) || { profDevEntries: [], certificateEntries: [] };
         
         if (portfolioType === 'course') {
-          existingData.profDevEntries = existingData.profDevEntries.map((e: any) => 
-            e.id === portfolioEntryId ? { ...e, pendingFile: file, previewUrl: null } : e
-          );
+          const exists = existingData.profDevEntries.some((e: any) => e.id === portfolioEntryId);
+          if (exists) {
+            existingData.profDevEntries = existingData.profDevEntries.map((e: any) => 
+              e.id === portfolioEntryId ? { ...e, pendingFile: file, previewUrl: null } : e
+            );
+          } else {
+            existingData.profDevEntries.push({
+              id: portfolioEntryId,
+              name: '',
+              role: '',
+              hours: '',
+              pendingFile: file,
+              previewUrl: null
+            });
+          }
         } else {
-          existingData.certificateEntries = existingData.certificateEntries.map((e: any) => 
-            e.id === portfolioEntryId ? { ...e, pendingFile: file, previewUrl: null } : e
-          );
+          const exists = existingData.certificateEntries.some((e: any) => e.id === portfolioEntryId);
+          if (exists) {
+            existingData.certificateEntries = existingData.certificateEntries.map((e: any) => 
+              e.id === portfolioEntryId ? { ...e, pendingFile: file, previewUrl: null } : e
+            );
+          } else {
+            existingData.certificateEntries.push({
+              id: portfolioEntryId,
+              name: '',
+              pendingFile: file,
+              previewUrl: null
+            });
+          }
         }
         await set(portfolioIdbKey, existingData);
       } catch (err) {

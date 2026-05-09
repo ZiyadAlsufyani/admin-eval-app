@@ -83,8 +83,8 @@ export default function StaffPortfolioScreen() {
         draft.certificateEntries.forEach(e => {
           if (e.pendingFile) e.previewUrl = URL.createObjectURL(e.pendingFile);
         });
-        setProfDevEntries(draft.profDevEntries);
-        setCertificateEntries(draft.certificateEntries);
+        setProfDevEntries(draft.profDevEntries.length > 0 ? draft.profDevEntries : [{ id: crypto.randomUUID(), name: '', role: '', hours: '' }]);
+        setCertificateEntries(draft.certificateEntries.length > 0 ? draft.certificateEntries : [{ id: crypto.randomUUID(), name: '' }]);
       }
       setIsIDBLoaded(true);
     }).catch(console.error);
