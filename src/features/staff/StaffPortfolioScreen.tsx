@@ -5,7 +5,7 @@ import { Icon } from '@/components/ui/icon';
 import { useAuth } from '@/components/auth/AuthProvider';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
-import { usePortfolioQuery, useSavePortfolioMutation } from '@/api/portfolio';
+import { useSavePortfolioMutation } from '@/api/portfolio';
 import type { StaffAchievement } from '@/api/portfolio';
 import { uploadPortfolioDocument, compressImageIfNeeded, MAX_FILE_SIZE_MB, MAX_PORTFOLIO_FILES_PER_ENTRY } from '@/api/storage';
 
