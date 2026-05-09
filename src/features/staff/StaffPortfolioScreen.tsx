@@ -143,10 +143,8 @@ export default function StaffPortfolioScreen() {
     const type = localStorage.getItem('portfolioUploadType');
     const entryId = localStorage.getItem('portfolioUploadEntryId');
     
-    // Clear input synchronously to prevent Android WebView/Chrome from locking the input after async errors
-    target.value = '';
-
     if (!rawFile || !type || !entryId) {
+      target.value = '';
       localStorage.removeItem('portfolioUploadType');
       localStorage.removeItem('portfolioUploadEntryId');
       return;
@@ -159,8 +157,10 @@ export default function StaffPortfolioScreen() {
 
       if (file.size > MAX_SIZE_BYTES) {
         const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
-        alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
-        return; // the finally block will clean up localStorage
+        setTimeout(() => {
+          alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
+        }, 10);
+        return; 
       }
 
       const preview = URL.createObjectURL(file);
@@ -169,7 +169,7 @@ export default function StaffPortfolioScreen() {
       if (type === 'course') {
         const entry = profDevRef.current.find(e => e.id === entryId);
         if (entry && (entry.document_url || entry.pendingFile) && MAX_PORTFOLIO_FILES_PER_ENTRY === 1) {
-           // Overwrite existing file logic (optional, we'll replace the existing pending file)
+           // Overwrite existing file logic
         }
         setProfDevEntries(prev => prev.map(e => 
           e.id === entryId ? { ...e, pendingFile: file, previewUrl: preview } : e
@@ -181,8 +181,10 @@ export default function StaffPortfolioScreen() {
       }
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء معالجة الملف.');
+      setTimeout(() => alert('حدث خطأ أثناء معالجة الملف.'), 10);
     } finally {
+      // Execute this immediately at the end of the async function to clean up
+      target.value = '';
       localStorage.removeItem('portfolioUploadType');
       localStorage.removeItem('portfolioUploadEntryId');
     }

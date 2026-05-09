@@ -30,8 +30,9 @@ if (globalInput) {
         const categoryFiles = existingData.pendingUploads[categoryId] || [];
         
         if (categoryFiles.length >= MAX_FILES_PER_CATEGORY) {
-          alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
-          target.value = '';
+          setTimeout(() => {
+            alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
+          }, 10);
           return;
         }
 
@@ -40,19 +41,21 @@ if (globalInput) {
 
         if (file.size > MAX_SIZE_BYTES) {
           const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
-          alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
-          target.value = '';
+          setTimeout(() => {
+            alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
+          }, 10);
           return;
         }
 
         categoryFiles.push({ file });
         existingData.pendingUploads[categoryId] = categoryFiles;
         await set(idbKey, existingData);
+      } catch (err) {
+        console.error('Pre-boot interceptor failed:', err);
+      } finally {
         localStorage.removeItem('pendingUploadCategory');
         localStorage.removeItem('currentUploadIdbKey');
         target.value = '';
-      } catch (err) {
-        console.error('Pre-boot interceptor failed:', err);
       }
     }
   });

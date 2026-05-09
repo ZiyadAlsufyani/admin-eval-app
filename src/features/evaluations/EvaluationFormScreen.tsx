@@ -216,45 +216,53 @@ export default function EvaluationFormScreen() {
     const currentPendingDeletions = pendingDeletionsRef.current;
     const totalFiles = currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + currentPending.length;
 
-    if (totalFiles >= MAX_FILES_PER_CATEGORY) {
-      alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
-      cleanupCallback?.();
-      return;
-    }
+    try {
+      if (totalFiles >= MAX_FILES_PER_CATEGORY) {
+        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 10);
+        return;
+      }
 
-    const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
+      const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
 
-    if (file.size > MAX_SIZE_BYTES) {
-      const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
-      cleanupCallback?.();
-      return;
-    }
-    const preview = URL.createObjectURL(file);
-
-    hasEditedRef.current = true;
-    setPendingUploads(prev => {
-      const existingFiles = prev[categoryId] || [];
-      const currentAtts = attachmentsRef.current[categoryId] || [];
-      const currentDels = pendingDeletionsRef.current;
-      const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
-      
-      if (finalTotal >= MAX_FILES_PER_CATEGORY) {
-        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
-        return prev;
+      if (file.size > MAX_SIZE_BYTES) {
+        const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        setTimeout(() => alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`), 10);
+        return;
       }
       
-      return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
-    });
+      const preview = URL.createObjectURL(file);
 
-    cleanupCallback?.();
+      hasEditedRef.current = true;
+      setPendingUploads(prev => {
+        const existingFiles = prev[categoryId] || [];
+        const currentAtts = attachmentsRef.current[categoryId] || [];
+        const currentDels = pendingDeletionsRef.current;
+        const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
+        
+        if (finalTotal >= MAX_FILES_PER_CATEGORY) {
+          setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 10);
+          return prev;
+        }
+        
+        return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
+      });
+    } catch (err) {
+      console.error(err);
+      setTimeout(() => alert('حدث خطأ أثناء معالجة الملف.'), 10);
+    } finally {
+      cleanupCallback?.();
+    }
   }, [profile, staff]);
 
   const handleGlobalFileChange = useCallback(async (e: Event | { target: HTMLInputElement }) => {
     const target = e.target as HTMLInputElement;
     const rawFile = target.files?.[0];
     const categoryId = localStorage.getItem('pendingUploadCategory');
-    if (!rawFile || !categoryId) { target.value = ''; return; }
+    if (!rawFile || !categoryId) {
+      target.value = '';
+      localStorage.removeItem('pendingUploadCategory');
+      return; 
+    }
 
     await processFileForCategory(rawFile, categoryId, () => {
       target.value = '';
