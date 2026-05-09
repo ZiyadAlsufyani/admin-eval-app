@@ -14,12 +14,16 @@ if (globalInput) {
   globalInput.addEventListener('change', async (e) => {
     // If the React component is actively mounted (e.g. on Windows or iOS where the app isn't killed),
     // skip the interceptor so we don't double-process the file.
-    if ((window as any).isEvaluationFormMounted) return;
+    if ((window as any).isEvaluationFormMounted || (window as any).isStaffPortfolioMounted) return;
 
     const target = e.target as HTMLInputElement;
     const rawFile = target.files?.[0];
     const categoryId = localStorage.getItem('pendingUploadCategory');
     const idbKey = localStorage.getItem('currentUploadIdbKey');
+
+    const portfolioType = localStorage.getItem('portfolioUploadType');
+    const portfolioEntryId = localStorage.getItem('portfolioUploadEntryId');
+    const portfolioIdbKey = localStorage.getItem('portfolioUploadIdbKey');
 
     if (rawFile && categoryId && idbKey) {
       try {
@@ -55,6 +59,39 @@ if (globalInput) {
       } finally {
         localStorage.removeItem('pendingUploadCategory');
         localStorage.removeItem('currentUploadIdbKey');
+        target.value = '';
+      }
+    } else if (rawFile && portfolioType && portfolioEntryId && portfolioIdbKey) {
+      try {
+        const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+        const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
+
+        if (file.size > MAX_SIZE_BYTES) {
+          const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
+          setTimeout(() => {
+            alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`);
+          }, 10);
+          return;
+        }
+
+        const existingData = (await get(portfolioIdbKey)) || { profDevEntries: [], certificateEntries: [] };
+        
+        if (portfolioType === 'course') {
+          existingData.profDevEntries = existingData.profDevEntries.map((e: any) => 
+            e.id === portfolioEntryId ? { ...e, pendingFile: file, previewUrl: null } : e
+          );
+        } else {
+          existingData.certificateEntries = existingData.certificateEntries.map((e: any) => 
+            e.id === portfolioEntryId ? { ...e, pendingFile: file, previewUrl: null } : e
+          );
+        }
+        await set(portfolioIdbKey, existingData);
+      } catch (err) {
+        console.error('Portfolio pre-boot interceptor failed:', err);
+      } finally {
+        localStorage.removeItem('portfolioUploadType');
+        localStorage.removeItem('portfolioUploadEntryId');
+        localStorage.removeItem('portfolioUploadIdbKey');
         target.value = '';
       }
     }

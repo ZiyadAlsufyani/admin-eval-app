@@ -65,6 +65,12 @@ export default function StaffPortfolioScreen() {
   useEffect(() => { profDevRef.current = profDevEntries; }, [profDevEntries]);
   useEffect(() => { certRef.current = certificateEntries; }, [certificateEntries]);
 
+  // Android Pre-boot Interceptor flag
+  useEffect(() => {
+    (window as any).isStaffPortfolioMounted = true;
+    return () => { (window as any).isStaffPortfolioMounted = false; };
+  }, []);
+
   // Phase 1: Load IDB Draft
   useEffect(() => {
     if (!idbKey || isIDBLoaded) return;
@@ -130,6 +136,9 @@ export default function StaffPortfolioScreen() {
   const triggerFileInput = (type: 'course' | 'certificate', entryId: string) => {
     localStorage.setItem('portfolioUploadType', type);
     localStorage.setItem('portfolioUploadEntryId', entryId);
+    if (idbKey) {
+      localStorage.setItem('portfolioUploadIdbKey', idbKey);
+    }
     const globalInput = document.getElementById('global-mobile-file-input') as HTMLInputElement;
     if (globalInput) {
       globalInput.value = '';
