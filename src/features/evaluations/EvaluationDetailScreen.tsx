@@ -55,7 +55,7 @@ export default function EvaluationDetailScreen() {
     );
   }
 
-  const { details = [], general_notes, overall_score_percentage, academic_week_number, week_start_date } = evaluation;
+  const { details = [], general_notes, overall_score_percentage, month_week_number, week_start_date, fiscal_month } = evaluation;
 
   // Extract all evidence files and attachments from details
   const attachments = details.flatMap((detail: any) => {
@@ -106,7 +106,7 @@ export default function EvaluationDetailScreen() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
             
             <p className="text-sm font-medium mb-1 z-10 opacity-90">
-              أسبوع {academic_week_number} • {formatDate(week_start_date)}
+              {fiscal_month ? `الشهر ${fiscal_month} ·` : ''} أسبوع {month_week_number} • {formatDate(week_start_date)}
             </p>
             <div className="text-5xl font-black font-headline tracking-tighter mb-2 z-10">
               {overall_score_percentage || 0}<span className="text-2xl font-bold opacity-80">%</span>

@@ -80,8 +80,9 @@ export default function StaffProfileScreen() {
   const starRating = avgDiscipline > 0 ? (avgDiscipline / 20).toFixed(1) : "0.0";
 
   const TOP_PADDING = 20;
-  const RIGHT_TEXT_PADDING = 30;
-  const CHART_WIDTH = 400 - RIGHT_TEXT_PADDING;
+  const LEFT_PAD = 26;          // space reserved for Y-axis labels
+  const RIGHT_TEXT_PADDING = 8; // small right margin
+  const CHART_WIDTH = 400 - LEFT_PAD - RIGHT_TEXT_PADDING; // 366 usable units
   const CHART_HEIGHT = 100;
 
   // Group history by fiscal_month
@@ -109,9 +110,9 @@ export default function StaffProfileScreen() {
   const displayData = sampleChartData(monthlyAverages, 6);
   
   const calculateX = (index: number) => {
-    if (displayData.length === 1) return CHART_WIDTH;
+    if (displayData.length === 1) return LEFT_PAD + CHART_WIDTH / 2;
     const spacing = CHART_WIDTH / (displayData.length - 1);
-    return CHART_WIDTH - (index * spacing);
+    return LEFT_PAD + index * spacing; // index 0 = left (oldest), last = right (newest)
   };
 
   const chartPoints = displayData.map((dataPoint, i) => {
@@ -121,9 +122,12 @@ export default function StaffProfileScreen() {
     return { x, y, score, label: `الشهر ${dataPoint.month}` };
   });
 
-  const pathStr = displayData.length === 1 
-    ? `M0,${CHART_HEIGHT + TOP_PADDING} L${chartPoints[0]?.x},${chartPoints[0]?.y} L${CHART_WIDTH},${CHART_HEIGHT + TOP_PADDING}`
+  const pathStr = displayData.length === 1
+    ? `M${LEFT_PAD},${CHART_HEIGHT + TOP_PADDING} L${chartPoints[0]?.x},${chartPoints[0]?.y} L${LEFT_PAD + CHART_WIDTH},${CHART_HEIGHT + TOP_PADDING}`
     : chartPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+
+  // Area fill closes down to the x-axis baseline
+  const areaStr = pathStr + ` L${LEFT_PAD + CHART_WIDTH},${CHART_HEIGHT + TOP_PADDING} L${LEFT_PAD},${CHART_HEIGHT + TOP_PADDING} Z`;
 
   return (
     <div className="bg-surface text-on-surface min-h-screen pb-24 font-body" dir="rtl">
@@ -268,18 +272,29 @@ export default function StaffProfileScreen() {
                     </linearGradient>
                   </defs>
 
-                  {/* Y-Axis Gridlines */}
-                  <g className="text-secondary/30">
-                    <line x1="0" y1={TOP_PADDING} x2={CHART_WIDTH} y2={TOP_PADDING} stroke="currentColor" strokeOpacity="0.1" strokeDasharray="4 4" />
-                    <text x="395" y={TOP_PADDING + 4} textAnchor="end" className="text-[10px] fill-secondary/50 font-bold">100</text>
-                    <line x1="0" y1={CHART_HEIGHT/2 + TOP_PADDING} x2={CHART_WIDTH} y2={CHART_HEIGHT/2 + TOP_PADDING} stroke="currentColor" strokeOpacity="0.1" strokeDasharray="4 4" />
-                    <text x="395" y={CHART_HEIGHT/2 + TOP_PADDING + 4} textAnchor="end" className="text-[10px] fill-secondary/50 font-bold">50</text>
-                    <line x1="0" y1={CHART_HEIGHT + TOP_PADDING} x2={CHART_WIDTH} y2={CHART_HEIGHT + TOP_PADDING} stroke="currentColor" strokeOpacity="0.1" strokeDasharray="4 4" />
-                    <text x="395" y={CHART_HEIGHT + TOP_PADDING + 4} textAnchor="end" className="text-[10px] fill-secondary/50 font-bold">0</text>
-                  </g>
+                  {/* Y-Axis gridlines */}
+                  <line x1={LEFT_PAD} y1={TOP_PADDING} x2={LEFT_PAD + CHART_WIDTH} y2={TOP_PADDING}
+                    stroke="#f1f5f9" strokeWidth={1} strokeDasharray="3 3" />
+
+                  <line x1={LEFT_PAD} y1={CHART_HEIGHT / 2 + TOP_PADDING} x2={LEFT_PAD + CHART_WIDTH} y2={CHART_HEIGHT / 2 + TOP_PADDING}
+                    stroke="#f1f5f9" strokeWidth={1} strokeDasharray="3 3" />
+
+                  {/* X-axis baseline */}
+                  <line x1={LEFT_PAD} y1={CHART_HEIGHT + TOP_PADDING} x2={LEFT_PAD + CHART_WIDTH} y2={CHART_HEIGHT + TOP_PADDING}
+                    stroke="#cbd5e1" strokeWidth={1.5} />
+
+                  {/* Y-axis vertical line */}
+                  <line x1={LEFT_PAD} y1={TOP_PADDING} x2={LEFT_PAD} y2={CHART_HEIGHT + TOP_PADDING}
+                    stroke="#cbd5e1" strokeWidth={1.5} />
+
+                  {/* Y-axis labels — fixed RTL collision by forcing LTR and end alignment */}
+                  <text x={LEFT_PAD - 6} y={TOP_PADDING + 4} textAnchor="end" style={{ direction: 'ltr' }} fontSize={8} fill="#94a3b8" fontWeight={500}>100</text>
+                  <text x={LEFT_PAD - 6} y={CHART_HEIGHT / 2 + TOP_PADDING + 4} textAnchor="end" style={{ direction: 'ltr' }} fontSize={8} fill="#94a3b8" fontWeight={500}>50</text>
+                  <text x={LEFT_PAD - 6} y={CHART_HEIGHT + TOP_PADDING - 4} textAnchor="end" style={{ direction: 'ltr' }} fontSize={8} fill="#94a3b8" fontWeight={500}>0</text>
+
                   
-                  <path d={`${pathStr} V${CHART_HEIGHT + TOP_PADDING} H0 Z`} fill="url(#chartFill)"></path>
-                  <path d={pathStr} fill="none" stroke="#2fab99" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" className="transition-all duration-1000 origin-left scale-x-100 group-hover:stroke-teal-600"></path>
+                  <path d={areaStr} fill="url(#chartFill)" />
+                  <path d={pathStr} fill="none" stroke="#2fab99" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" className="transition-all duration-1000 group-hover:stroke-teal-600" />
                   
                   {chartPoints.map((p, i) => (
                     <g key={i}>
@@ -323,7 +338,7 @@ export default function StaffProfileScreen() {
                     className="absolute z-20 bg-surface-container-high text-on-surface shadow-lg rounded-xl px-3 py-2 text-xs border border-outline-variant/30 animate-in fade-in zoom-in-95 duration-200 pointer-events-none flex flex-col items-center gap-0.5"
                     style={{ 
                       left: `${(chartPoints[activePoint].x / 400) * 100}%`,
-                      top: `${(chartPoints[activePoint].y / 150) * 100}%`,
+                      top: `${(chartPoints[activePoint].y / (CHART_HEIGHT + TOP_PADDING * 2)) * 100}%`,
                       transform: 'translate(-50%, -120%)'
                     }}
                   >
