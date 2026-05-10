@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 export const MAX_FILE_SIZE_MB = 5;
 export const MAX_FILES_PER_CATEGORY = 2;
+export const MAX_PORTFOLIO_FILES_PER_ENTRY = 1;
 
 /**
  * Uploads an evidence document to the evaluation_evidence bucket.
@@ -13,6 +14,18 @@ export const MAX_FILES_PER_CATEGORY = 2;
  * @param categoryId The ID of the evaluation category (e.g., 'attendance').
  * @returns The storage path of the uploaded file.
  */
+// Maps common MIME types to safe file extensions as a fallback when the
+// file name has no extension or carries an ambiguous one.
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+};
+
 export async function uploadEvaluationEvidence(
   file: File,
   schoolId: string,
@@ -20,8 +33,19 @@ export async function uploadEvaluationEvidence(
   weekStartDate: string,
   categoryId: string
 ): Promise<string> {
-  const nameParts = file.name.split('.');
-  const fileExt = nameParts.length > 1 ? nameParts.pop() : (file.type.split('/')[1] || 'bin');
+  // Use lastIndexOf to avoid split/pop returning undefined, and guard against
+  // dotfiles (dotIndex === 0) and trailing dots (dotIndex === last char).
+  const dotIndex = file.name.lastIndexOf('.');
+  const nameExt =
+    dotIndex > 0 && dotIndex < file.name.length - 1
+      ? file.name.slice(dotIndex + 1)
+      : '';
+  // Prefer the name-derived ext, then the MIME map, then the raw MIME subtype
+  // (trimmed of any suffix like "+xml"), then 'bin' as a safe last resort.
+  const fileExt =
+    nameExt ||
+    MIME_TO_EXT[file.type] ||
+    (file.type.split('/')[1]?.split('+')[0] ?? 'bin');
   const safeWeekDate = weekStartDate.replace(/[^a-zA-Z0-9-]/g, '');
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
   
@@ -37,6 +61,53 @@ export async function uploadEvaluationEvidence(
 
   if (error) {
     console.error('Error uploading evidence:', error);
+    throw error;
+  }
+
+  return data.path;
+}
+
+/**
+ * Uploads a document to the portfolio_documents bucket for the staff portfolio.
+ * 
+ * @param file The file to upload.
+ * @param schoolId The ID of the school.
+ * @param staffId The ID of the staff member.
+ * @param type The type of entry ('course' or 'certificate').
+ * @param entryId The unique ID of the entry.
+ * @returns The storage path of the uploaded file.
+ */
+export async function uploadPortfolioDocument(
+  file: File,
+  schoolId: string,
+  staffId: string,
+  type: string,
+  entryId: string
+): Promise<string> {
+  const dotIndex = file.name.lastIndexOf('.');
+  const nameExt =
+    dotIndex > 0 && dotIndex < file.name.length - 1
+      ? file.name.slice(dotIndex + 1)
+      : '';
+  const fileExt =
+    nameExt ||
+    MIME_TO_EXT[file.type] ||
+    (file.type.split('/')[1]?.split('+')[0] ?? 'bin');
+  
+  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+  
+  // Use the corrected path pattern
+  const filePath = `${schoolId}/${staffId}/portfolio/${type}/${entryId}/${fileName}`;
+
+  const { data, error } = await supabase.storage
+    .from('portfolio_documents')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (error) {
+    console.error('Error uploading portfolio document:', error);
     throw error;
   }
 
@@ -72,3 +143,53 @@ export async function deleteEvaluationEvidence(path: string): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Compresses an image file via canvas to fit within the size limit.
+ * Non-image files are returned as-is.
+ */
+export const compressImageIfNeeded = (file: File, maxBytes: number): Promise<File> => {
+  if (!file.type.startsWith('image/') || file.size <= maxBytes) {
+    return Promise.resolve(file);
+  }
+
+  return new Promise(resolve => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX_DIM = 1920;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      try {
+        ctx.drawImage(img, 0, 0, width, height);
+      } catch {
+        resolve(file);
+        return;
+      }
+      canvas.toBlob(blob => {
+        if (blob && blob.size <= maxBytes) {
+          resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+        } else {
+          canvas.toBlob(blob2 => {
+            resolve(blob2
+              ? new File([blob2], file.name, { type: 'image/jpeg', lastModified: Date.now() })
+              : file);
+          }, 'image/jpeg', 0.6);
+        }
+      }, 'image/jpeg', 0.85);
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+};

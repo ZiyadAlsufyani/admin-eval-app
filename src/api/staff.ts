@@ -61,3 +61,32 @@ export function useStaffQuery(weekStartDate?: Date) {
     }
   });
 }
+
+/**
+ * Fetches a single staff member's profile by ID.
+ * Uses a narrow column selection so that no other staff data is fetched or exposed.
+ * Intended for use when viewing a single profile (both staff self-view and principal view).
+ */
+export function useStaffProfileQuery(staffId: string | undefined) {
+  return useQuery({
+    queryKey: ['staff_profile', staffId],
+    queryFn: async (): Promise<Pick<StaffMember, 'id' | 'name' | 'role' | 'avatarUrl' | 'created_at'>> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, job_title, avatar_url, created_at')
+        .eq('id', staffId!)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        name: data.full_name,
+        role: data.job_title || 'الاداري/ة',
+        avatarUrl: data.avatar_url,
+        created_at: data.created_at,
+      };
+    },
+    enabled: !!staffId,
+  });
+}

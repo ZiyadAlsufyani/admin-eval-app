@@ -43,7 +43,7 @@ export function ProtectedRoute() {
 
   // Enforce isolation between roles
   const principalRoutes = ['/admin-dashboard', '/staff', '/tasks', '/evaluate'];
-  const staffRoutes = ['/staff-dashboard', '/staff-profile'];
+  const staffRoutes = ['/staff-dashboard', '/staff-profile', '/staff-portfolio'];
 
   const isPrincipalRoute = principalRoutes.some(route => location.pathname === route || location.pathname.startsWith(`${route}/`));
   const isStaffRoute = staffRoutes.some(route => location.pathname === route || location.pathname.startsWith(`${route}/`));

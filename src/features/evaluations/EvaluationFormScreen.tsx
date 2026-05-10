@@ -5,7 +5,8 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEvaluationQuery, useSaveEvaluationMutation } from '@/api/evaluations';
 import { AppHeader } from '@/components/layout/AppHeader';
-import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
+import { Avatar } from '@/components/ui/Avatar';
+import { uploadEvaluationEvidence, deleteEvaluationEvidence, getEvidenceUrl, compressImageIfNeeded, MAX_FILE_SIZE_MB, MAX_FILES_PER_CATEGORY } from '@/api/storage';
 import { set as idbSet, get as idbGet, del as idbDel } from 'idb-keyval';
 import { formatISODate } from '@/utils/date';
 
@@ -17,10 +18,17 @@ interface EvaluationDraft {
   pendingUploads: Record<string, { file: File }[]>;
 }
 
+const QUESTIONS = [
+  { id: 'attendance', label: 'الحضور والانصراف' },
+  { id: 'duty', label: 'إشراف الأدوار' },
+  { id: 'break', label: 'إشراف الفسحة' },
+  { id: 'supervision', label: 'المناوبة' },
+];
+
 export default function EvaluationFormScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
-  const { staffList, updateStaffStatus, selectedEvaluationWeek, academicContext } = useOutletContext<StaffOutletContext>();
+  const { staffList, updateStaffStatus, selectedEvaluationWeek, fiscalContext } = useOutletContext<StaffOutletContext>();
   const { profile } = useAuth();
 
   const staff = staffList.find(s => s.id === staffId);
@@ -44,6 +52,8 @@ export default function EvaluationFormScreen() {
   const [isIDBLoaded, setIsIDBLoaded] = useState(false);
   // Prevents the DB-hydration effect from overwriting IDB-restored state
   const isRestoredRef = useRef(false);
+  // Tracks if the user has actually made an edit to prevent saving phantom drafts
+  const hasEditedRef = useRef(false);
 
   // ---- Refs for access inside stable callbacks ----
   const attachmentsRef = useRef(attachments);
@@ -52,6 +62,12 @@ export default function EvaluationFormScreen() {
   useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
   useEffect(() => { pendingUploadsRef.current = pendingUploads; }, [pendingUploads]);
   useEffect(() => { pendingDeletionsRef.current = pendingDeletions; }, [pendingDeletions]);
+
+  // Tell main.tsx interceptor that the React component is actively handling events
+  useEffect(() => {
+    (window as any).isEvaluationFormMounted = true;
+    return () => { (window as any).isEvaluationFormMounted = false; };
+  }, []);
 
   // ---- Phase 1: Load IDB draft on mount ----
   useEffect(() => {
@@ -79,25 +95,48 @@ export default function EvaluationFormScreen() {
     });
   }, [idbKey]);
 
-  // ---- Phase 2: Hydrate from DB evaluation (only if no IDB draft) ----
+  // ---- Phase 2: Hydrate from DB evaluation ----
   useEffect(() => {
-    if (isRestoredRef.current) return;
+    if (!existingEvaluation) return;
 
-    if (existingEvaluation) {
+    // 1. ALWAYS hydrate attachments from DB because they are never stored in IDB
+    const newAttachments: Record<string, string[]> = {};
+    existingEvaluation.details.forEach((detail: any) => {
+      let parsedAttachments: string[] = [];
+      if (detail.attachments) {
+        if (Array.isArray(detail.attachments)) {
+          parsedAttachments = [...detail.attachments];
+        } else if (typeof detail.attachments === 'string') {
+          try {
+            const parsed = JSON.parse(detail.attachments);
+            if (Array.isArray(parsed)) parsedAttachments = [...parsed];
+          } catch (e) {
+            console.error('Failed to parse attachments JSON string', e);
+          }
+        }
+      } else if (detail.evidence_file_url) {
+        parsedAttachments = [detail.evidence_file_url];
+      }
+
+      if (parsedAttachments.length > 0) {
+        newAttachments[detail.category_name] = parsedAttachments;
+      }
+    });
+    setAttachments(newAttachments);
+
+    // 2. ONLY hydrate mutable draft state if we haven't already restored an active IDB draft
+    if (!isRestoredRef.current) {
       const newRatings: Record<string, number> = {};
       const newJustifs: Record<string, string> = {};
-      const newAttachments: Record<string, string[]> = {};
+      
       existingEvaluation.details.forEach((detail: any) => {
-        newRatings[detail.category_name] = detail.score;
+        if (detail.score) newRatings[detail.category_name] = detail.score;
         if (detail.justification_notes) newJustifs[detail.category_name] = detail.justification_notes;
-        if (detail.attachments && Array.isArray(detail.attachments)) {
-          newAttachments[detail.category_name] = detail.attachments;
-        }
       });
+      
       setNotes(existingEvaluation.general_notes || '');
       setRatings(newRatings);
       setJustifications(newJustifs);
-      setAttachments(newAttachments);
       setPendingUploads({});
       setPendingDeletions([]);
     }
@@ -109,11 +148,12 @@ export default function EvaluationFormScreen() {
 
     const hasDraftContent =
       Object.keys(ratings).length > 0 ||
-      Object.keys(justifications).length > 0 ||
-      notes.length > 0 ||
+      Object.values(justifications).some(v => v.trim().length > 0) ||
+      notes.trim().length > 0 ||
       Object.values(pendingUploads).some(arr => arr.length > 0);
 
-    if (hasDraftContent) {
+    // Only write to IDB if the user has actively made an edit
+    if (hasDraftContent && hasEditedRef.current) {
       const storable: EvaluationDraft = {
         ratings,
         justifications,
@@ -148,123 +188,87 @@ export default function EvaluationFormScreen() {
     );
   }
 
-  const QUESTIONS = [
-    { id: 'attendance', label: 'الحضور والانصراف' },
-    { id: 'duty', label: 'إشراف الأدوار' },
-    { id: 'break', label: 'إشراف الفسحة' },
-    { id: 'supervision', label: 'المناوبة' },
-  ];
+  // Remove internal QUESTIONS definition
 
-  const handleRating = (questionId: string, score: number) => {
+  const handleRating = useCallback((questionId: string, score: number) => {
+    hasEditedRef.current = true;
     setRatings(prev => ({ ...prev, [questionId]: score }));
-  };
+  }, []);
 
-  const handleJustification = (questionId: string, text: string) => {
-    setJustifications(prev => ({ ...prev, [questionId]: text }));
-  };
-
-  /**
-   * Compresses an image file via canvas to fit within the size limit.
-   * Non-image files are returned as-is.
-   */
-  const compressImageIfNeeded = (file: File, maxBytes: number): Promise<File> => {
-    if (!file.type.startsWith('image/') || file.size <= maxBytes) {
-      return Promise.resolve(file);
-    }
-
-    return new Promise(resolve => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        const MAX_DIM = 1920;
-        let { width, height } = img;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d')!;
-        try {
-          ctx.drawImage(img, 0, 0, width, height);
-        } catch {
-          resolve(file);
-          return;
-        }
-        canvas.toBlob(blob => {
-          if (blob && blob.size <= maxBytes) {
-            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
-          } else {
-            canvas.toBlob(blob2 => {
-              resolve(blob2
-                ? new File([blob2], file.name, { type: 'image/jpeg', lastModified: Date.now() })
-                : file);
-            }, 'image/jpeg', 0.6);
-          }
-        }, 'image/jpeg', 0.85);
-      };
-
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
-      img.src = objectUrl;
+  const handleJustification = useCallback((questionId: string, text: string) => {
+    hasEditedRef.current = true;
+    setJustifications(prev => {
+      if (text === '') {
+        const { [questionId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [questionId]: text };
     });
-  };
+  }, []);
 
-  const processFileForCategory = async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
+  const processFileForCategory = useCallback(async (rawFile: File, categoryId: string, cleanupCallback?: () => void) => {
     if (!profile || !staff) { cleanupCallback?.(); return; }
 
+    const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    
     const currentAttachments = attachmentsRef.current[categoryId] || [];
     const currentPending = pendingUploadsRef.current[categoryId] || [];
     const currentPendingDeletions = pendingDeletionsRef.current;
-    const totalFiles =
-      currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length +
-      currentPending.length;
+    const totalFiles = currentAttachments.filter(path => !currentPendingDeletions.includes(path)).length + currentPending.length;
 
-    if (totalFiles >= MAX_FILES_PER_CATEGORY) {
-      alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`);
-      cleanupCallback?.();
-      return;
-    }
-
-    const MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-    const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
-
-    if (file.size > MAX_SIZE_BYTES) {
-      alert(`حجم الملف كبير جداً. الحد الأقصى هو ${MAX_FILE_SIZE_MB} ميجابايت.`);
-      cleanupCallback?.();
-      return;
-    }
-
-    const preview = URL.createObjectURL(file);
-
-    setPendingUploads(prev => {
-      const existingFiles = prev[categoryId] || [];
-      const currentAtts = attachmentsRef.current[categoryId] || [];
-      const currentDels = pendingDeletionsRef.current;
-      const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
-      if (finalTotal >= MAX_FILES_PER_CATEGORY) {
-        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 0);
-        return prev;
+    try {
+      if (totalFiles >= MAX_FILES_PER_CATEGORY) {
+        setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 10);
+        return;
       }
-      return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
-    });
 
-    cleanupCallback?.();
-  };
+      const file = await compressImageIfNeeded(rawFile, MAX_SIZE_BYTES);
+
+      if (file.size > MAX_SIZE_BYTES) {
+        const actualSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        setTimeout(() => alert(`حجم الملف (${actualSizeMB} ميجابايت) يتجاوز الحد الأقصى وهو ${MAX_FILE_SIZE_MB} ميجابايت.`), 10);
+        return;
+      }
+      
+      const preview = URL.createObjectURL(file);
+
+      hasEditedRef.current = true;
+      setPendingUploads(prev => {
+        const existingFiles = prev[categoryId] || [];
+        const currentAtts = attachmentsRef.current[categoryId] || [];
+        const currentDels = pendingDeletionsRef.current;
+        const finalTotal = currentAtts.filter(p => !currentDels.includes(p)).length + existingFiles.length;
+        
+        if (finalTotal >= MAX_FILES_PER_CATEGORY) {
+          setTimeout(() => alert(`الحد الأقصى هو ${MAX_FILES_PER_CATEGORY} مرفقات لكل قسم.`), 10);
+          return prev;
+        }
+        
+        return { ...prev, [categoryId]: [...existingFiles, { file, preview }] };
+      });
+    } catch (err) {
+      console.error(err);
+      setTimeout(() => alert('حدث خطأ أثناء معالجة الملف.'), 10);
+    } finally {
+      cleanupCallback?.();
+    }
+  }, [profile, staff]);
 
   const handleGlobalFileChange = useCallback(async (e: Event | { target: HTMLInputElement }) => {
     const target = e.target as HTMLInputElement;
     const rawFile = target.files?.[0];
     const categoryId = localStorage.getItem('pendingUploadCategory');
-    if (!rawFile || !categoryId) { target.value = ''; return; }
+    if (!rawFile || !categoryId) {
+      target.value = '';
+      localStorage.removeItem('pendingUploadCategory');
+      return; 
+    }
+
     await processFileForCategory(rawFile, categoryId, () => {
       target.value = '';
       localStorage.removeItem('pendingUploadCategory');
     });
-  }, [profile, staff]);
+  }, [processFileForCategory]);
 
   // ---- Hook up the single global file listener ----
   useEffect(() => {
@@ -284,7 +288,8 @@ export default function EvaluationFormScreen() {
     globalInput?.click();
   };
 
-  const handleDeleteFile = (categoryId: string, pathOrPreview: string, isPending: boolean) => {
+  const handleDeleteFile = useCallback((categoryId: string, pathOrPreview: string, isPending: boolean) => {
+    hasEditedRef.current = true;
     if (isPending) {
       URL.revokeObjectURL(pathOrPreview);
       setPendingUploads(prev => ({
@@ -296,17 +301,18 @@ export default function EvaluationFormScreen() {
         setPendingDeletions(prev => [...prev, pathOrPreview]);
       }
     }
-  };
+  }, [pendingDeletions]);
 
   const buildPayload = (status: 'draft' | 'submitted', finalAttachments: Record<string, string[]>) => {
     if (!profile || !staff) return null;
 
-    // Skip unanswered questions — DB CHECK constraint requires score >= 1.
+    // Include questions that have a score, or have attachments, or have notes.
+    // NOTE: This requires the DB 'score' column to allow NULL values for drafts.
     const details = QUESTIONS
-      .filter(q => !!ratings[q.id])
+      .filter(q => !!ratings[q.id] || (finalAttachments[q.id] && finalAttachments[q.id].length > 0) || !!justifications[q.id])
       .map(q => ({
         category_name: q.id,
-        score: ratings[q.id],
+        score: ratings[q.id] || null,
         justification_notes: justifications[q.id] || '',
         attachments: finalAttachments[q.id] || [],
       }));
@@ -321,13 +327,14 @@ export default function EvaluationFormScreen() {
       school_id: profile.school_id,
       staff_id: staff.id,
       evaluator_id: profile.id,
-      academic_year: academicContext?.activeTerm.academic_year || '2024-2025',
+      fiscal_year_label: fiscalContext?.activeFiscalYear.year_label || '2024-2025',
       week_start_date: weekStartDateString,
       status,
       general_notes: notes,
       overall_score_percentage,
-      term_id: academicContext?.activeTerm.id,
-      academic_week_number: academicContext?.weekNumber,
+      fiscal_year_id: fiscalContext?.activeFiscalYear.id,
+      month_week_number: fiscalContext?.weekNumber,
+      fiscal_month: fiscalContext?.currentMonth,
       details,
     };
   };
@@ -435,11 +442,18 @@ export default function EvaluationFormScreen() {
           <div className="flex items-center justify-between">
             <span className="bg-vertex-teal text-white px-3 py-1 rounded-full text-[10px] font-bold">نموذج التقييم الاسبوعي</span>
             <span className="text-xs font-semibold text-secondary">
-              {academicContext?.weekNumber ? `الأسبوع ${academicContext.weekNumber}` : 'الأسبوع الحالي'}
+              {fiscalContext?.currentMonth && fiscalContext?.weekNumber 
+                ? `تقييم الشهر ${fiscalContext.currentMonth} - الأسبوع ${fiscalContext.weekNumber}` 
+                : 'الأسبوع الحالي'}
             </span>
           </div>
           <div className="flex gap-4 items-center pt-2">
-            <img src={staff.avatarUrl || `https://ui-avatars.com/api/?name=${staff.name}&background=random`} alt={staff.name} className="w-16 h-16 rounded-xl object-cover shadow-sm bg-surface-container" />
+            <Avatar 
+              name={staff.name} 
+              imageUrl={staff.avatarUrl} 
+              size="lg" 
+              shape="square" 
+            />
             <div>
               <h2 className="text-lg font-bold text-foreground">{staff.name}</h2>
               <p className="text-sm font-medium text-secondary">{staff.subject || staff.role}</p>
@@ -571,7 +585,10 @@ export default function EvaluationFormScreen() {
             <textarea
               maxLength={1000}
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                hasEditedRef.current = true;
+                setNotes(e.target.value);
+              }}
               className="w-full min-h-[120px] p-4 bg-transparent border-none focus:ring-0 text-sm resize-none"
               placeholder="أدخل ملاحظات التقييم النوعي هنا..."
             />

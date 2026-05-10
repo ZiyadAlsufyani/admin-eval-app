@@ -12,7 +12,7 @@ import { Avatar } from '@/components/ui/Avatar';
 export default function StaffManagementScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile, school } = useAuth();
+  const { profile, school, isLoading: isAuthLoading } = useAuth();
   const { data: staffList = [], isLoading } = useStaffQuery();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -211,7 +211,7 @@ export default function StaffManagementScreen() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isInviting || !inviteEmail}
+                  disabled={isAuthLoading || isInviting || !inviteEmail}
                   className="flex-1 py-3.5 rounded-xl bg-primary text-white font-bold disabled:opacity-50 disabled:active:scale-100 hover:bg-brand-teal active:scale-[0.98] transition-all"
                 >
                   {isInviting ? 'جاري الإرسال...' : 'إرسال الدعوة'}
@@ -227,7 +227,7 @@ export default function StaffManagementScreen() {
 
             <button
               onClick={handleWhatsAppInvite}
-              disabled={isWhatsAppLoading}
+              disabled={isAuthLoading || isWhatsAppLoading}
               className="w-full py-3.5 rounded-xl bg-[#25D366] hover:bg-[#1DA851] text-white font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:active:scale-100 active:scale-[0.98]"
             >
               {isWhatsAppLoading ? (

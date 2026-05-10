@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { useStaffQuery } from '@/api/staff';
-import { useStaffEvaluationsHistoryQuery } from '@/api/evaluations';
+import { useStaffEvaluationsHistoryQuery, useStaffPerformanceTrendQuery } from '@/api/evaluations';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { Icon } from '@/components/ui/icon';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { StaffAchievementsView } from './StaffAchievementsView';
 
 function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
   if (data.length <= maxPoints) return data;
@@ -14,24 +14,49 @@ function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
   return Array.from({ length: maxPoints }, (_, i) => data[Math.round(i * step)]);
 }
 
+interface EvaluationHistoryItem {
+  id: string;
+  overall_score_percentage: number;
+  month_week_number: number;
+  fiscal_month: number;
+  week_start_date: string;
+}
+
 export default function StaffProfileScreen() {
   const { staffId } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  
+  const { staffList, fiscalContext } = useOutletContext<StaffOutletContext>();
+
   const isPrincipal = profile?.role === 'principal';
   const effectiveStaffId = isPrincipal ? staffId : profile?.id;
 
-  const { data: staffList = [], isLoading } = useStaffQuery();
-  const { academicContext } = useOutletContext<StaffOutletContext>();
-  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, academicContext?.activeTerm?.academic_year);
+  // For principals: find from the already-fetched list in the outlet context.
+  // For staff: map directly from their own profile (already loaded, no extra fetch needed).
+  const staff = isPrincipal
+    ? staffList.find(s => s.id === effectiveStaffId)
+    : profile
+      ? {
+          id: profile.id,
+          name: profile.full_name,
+          role: profile.job_title || 'الاداري/ة',
+          avatarUrl: profile.avatar_url,
+          created_at: profile.created_at,
+        }
+      : undefined;
+
+  const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, fiscalContext?.activeFiscalYear?.year_label);
+  const { data: trendData } = useStaffPerformanceTrendQuery(effectiveStaffId);
   const [activePoint, setActivePoint] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'evaluations' | 'portfolio'>(() => {
+    const saved = localStorage.getItem('staff_profile_active_tab');
+    return saved === 'portfolio' ? 'portfolio' : 'evaluations';
+  });
 
-  const staff = staffList.find(s => s.id === effectiveStaffId);
-
-  if (isLoading) {
-    return <div className="p-8 text-center bg-surface min-h-screen text-primary font-bold">جاري التحميل...</div>;
-  }
+  const handleTabChange = (tab: 'evaluations' | 'portfolio') => {
+    setActiveTab(tab);
+    localStorage.setItem('staff_profile_active_tab', tab);
+  };
 
   if (!staff) {
     return (
@@ -55,30 +80,54 @@ export default function StaffProfileScreen() {
   const starRating = avgDiscipline > 0 ? (avgDiscipline / 20).toFixed(1) : "0.0";
 
   const TOP_PADDING = 20;
-  const RIGHT_TEXT_PADDING = 30;
-  const CHART_WIDTH = 400 - RIGHT_TEXT_PADDING;
+  const LEFT_PAD = 26;          // space reserved for Y-axis labels
+  const RIGHT_TEXT_PADDING = 8; // small right margin
+  const CHART_WIDTH = 400 - LEFT_PAD - RIGHT_TEXT_PADDING; // 366 usable units
   const CHART_HEIGHT = 100;
 
-  // Chart data calculations
-  const chronologicalData = [...historyData].reverse();
-  const displayData = sampleChartData(chronologicalData, 6);
+  // Group history by fiscal_month
+  const groupedHistory = historyData.reduce((acc: Record<number, EvaluationHistoryItem[]>, curr: any) => {
+    const item = curr as EvaluationHistoryItem;
+    const month = item.fiscal_month || 1;
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(item);
+    return acc;
+  }, {});
   
-  const calculateX = (index: number) => {
-    if (displayData.length === 1) return CHART_WIDTH;
-    const spacing = CHART_WIDTH / (displayData.length - 1);
-    return CHART_WIDTH - (index * spacing);
-  };
+  // Sort months descending for the list view (newest first)
+  const sortedMonths = Object.keys(groupedHistory)
+    .map(Number)
+    .sort((a, b) => b - a);
 
-  const chartPoints = displayData.map((evalItem, i) => {
-    const score = evalItem.overall_score_percentage || 0;
-    const x = calculateX(i);
-    const y = (CHART_HEIGHT - (score / 100) * CHART_HEIGHT) + TOP_PADDING;
-    return { x, y, score, week: `أسبوع ${evalItem.academic_week_number || '?'}` };
+  // Chart data calculations (Monthly Averages)
+  const monthsInChronologicalOrder = [...sortedMonths].reverse(); // oldest first
+  const monthlyAverages = monthsInChronologicalOrder.map(month => {
+    const evals = groupedHistory[month];
+    const avg = evals.reduce((sum: number, item: EvaluationHistoryItem) => sum + (item.overall_score_percentage || 0), 0) / evals.length;
+    return { month, average: Math.round(avg) };
   });
 
-  const pathStr = displayData.length === 1 
-    ? `M0,${CHART_HEIGHT + TOP_PADDING} L${chartPoints[0]?.x},${chartPoints[0]?.y} L${CHART_WIDTH},${CHART_HEIGHT + TOP_PADDING}`
+  const displayData = sampleChartData(monthlyAverages, 6);
+  
+  const calculateX = (index: number) => {
+    if (displayData.length === 1) return LEFT_PAD + CHART_WIDTH / 2;
+    const spacing = CHART_WIDTH / (displayData.length - 1);
+    return LEFT_PAD + index * spacing; // index 0 = left (oldest), last = right (newest)
+  };
+
+  const chartPoints = displayData.map((dataPoint, i) => {
+    const score = dataPoint.average || 0;
+    const x = calculateX(i);
+    const y = (CHART_HEIGHT - (score / 100) * CHART_HEIGHT) + TOP_PADDING;
+    return { x, y, score, label: `الشهر ${dataPoint.month}` };
+  });
+
+  const pathStr = displayData.length === 1
+    ? `M${LEFT_PAD},${CHART_HEIGHT + TOP_PADDING} L${chartPoints[0]?.x},${chartPoints[0]?.y} L${LEFT_PAD + CHART_WIDTH},${CHART_HEIGHT + TOP_PADDING}`
     : chartPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+
+  // Area fill closes down to the x-axis baseline
+  const areaStr = pathStr + ` L${LEFT_PAD + CHART_WIDTH},${CHART_HEIGHT + TOP_PADDING} L${LEFT_PAD},${CHART_HEIGHT + TOP_PADDING} Z`;
 
   return (
     <div className="bg-surface text-on-surface min-h-screen pb-24 font-body" dir="rtl">
@@ -131,12 +180,75 @@ export default function StaffProfileScreen() {
           </div>
         </section>
 
+        {/* Performance Trend Feedback */}
+        {trendData && (
+          <section className={`p-4 rounded-xl flex items-center gap-4 shadow-sm border ${
+            trendData.trend === 'up' ? 'bg-green-50 border-green-100' :
+            trendData.trend === 'stable' ? 'bg-slate-50 border-slate-200' :
+            'bg-orange-50 border-orange-100'
+          }`}>
+            <div className={`p-3 rounded-full shrink-0 ${
+              trendData.trend === 'up' ? 'bg-green-100 text-green-600' :
+              trendData.trend === 'stable' ? 'bg-slate-200 text-slate-600' :
+              'bg-orange-100 text-orange-600'
+            }`}>
+              <Icon name={trendData.trend === 'up' ? 'TrendingUp' : trendData.trend === 'stable' ? 'Minus' : 'TrendingDown'} size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className={`text-sm font-bold mb-0.5 ${
+                trendData.trend === 'up' ? 'text-green-800' :
+                trendData.trend === 'stable' ? 'text-slate-800' :
+                'text-orange-800'
+              }`}>مؤشر الأداء</h3>
+              <p className={`text-xs font-medium leading-relaxed ${
+                trendData.trend === 'up' ? 'text-green-700' :
+                trendData.trend === 'stable' ? 'text-slate-600' :
+                'text-orange-700'
+              }`}>
+                {trendData.trend === 'up' ? 'أداؤك أعلى من الشهر السابق، استمر في هذا التميز!' :
+                 trendData.trend === 'stable' ? 'أداؤك مستقر وممتاز، حافظ على هذا المستوى!' :
+                 'لاحظنا تراجعاً بسيطاً هذا الشهر، نحن نثق بقدراتك للعودة أقوى!'}
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* ── Segmented Tab Control ── */}
+        <div className="flex bg-surface-container rounded-2xl p-1 shadow-sm border border-outline-variant/10" role="tablist" aria-label="تبديل القسم">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'evaluations'}
+            onClick={() => handleTabChange('evaluations')}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+              activeTab === 'evaluations'
+                ? 'bg-surface-container-lowest text-vertex-teal shadow-sm'
+                : 'text-secondary hover:text-on-surface'
+            }`}
+          >
+            التقييمات الأسبوعية
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'portfolio'}
+            onClick={() => handleTabChange('portfolio')}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+              activeTab === 'portfolio'
+                ? 'bg-surface-container-lowest text-vertex-teal shadow-sm'
+                : 'text-secondary hover:text-on-surface'
+            }`}
+          >
+            ملف الإنجاز
+          </button>
+        </div>
+
+        {activeTab === 'evaluations' && (
+          <>
         {/* Performance Chart Section */}
         <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_20px_rgba(11,28,48,0.04)]">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-bold text-on-surface font-headline">اتجاه الأداء</h3>
             <span className="text-[10px] text-secondary font-medium px-2 py-1 bg-surface-container rounded-lg">
-              السنة الدراسية - {academicContext?.activeTerm.academic_year}
+              السنة المالية - {fiscalContext?.activeFiscalYear.year_label}
             </span>
           </div>
           
@@ -160,18 +272,29 @@ export default function StaffProfileScreen() {
                     </linearGradient>
                   </defs>
 
-                  {/* Y-Axis Gridlines */}
-                  <g className="text-secondary/30">
-                    <line x1="0" y1={TOP_PADDING} x2={CHART_WIDTH} y2={TOP_PADDING} stroke="currentColor" strokeOpacity="0.1" strokeDasharray="4 4" />
-                    <text x="395" y={TOP_PADDING + 4} textAnchor="end" className="text-[10px] fill-secondary/50 font-bold">100</text>
-                    <line x1="0" y1={CHART_HEIGHT/2 + TOP_PADDING} x2={CHART_WIDTH} y2={CHART_HEIGHT/2 + TOP_PADDING} stroke="currentColor" strokeOpacity="0.1" strokeDasharray="4 4" />
-                    <text x="395" y={CHART_HEIGHT/2 + TOP_PADDING + 4} textAnchor="end" className="text-[10px] fill-secondary/50 font-bold">50</text>
-                    <line x1="0" y1={CHART_HEIGHT + TOP_PADDING} x2={CHART_WIDTH} y2={CHART_HEIGHT + TOP_PADDING} stroke="currentColor" strokeOpacity="0.1" strokeDasharray="4 4" />
-                    <text x="395" y={CHART_HEIGHT + TOP_PADDING + 4} textAnchor="end" className="text-[10px] fill-secondary/50 font-bold">0</text>
-                  </g>
+                  {/* Y-Axis gridlines */}
+                  <line x1={LEFT_PAD} y1={TOP_PADDING} x2={LEFT_PAD + CHART_WIDTH} y2={TOP_PADDING}
+                    stroke="#f1f5f9" strokeWidth={1} strokeDasharray="3 3" />
+
+                  <line x1={LEFT_PAD} y1={CHART_HEIGHT / 2 + TOP_PADDING} x2={LEFT_PAD + CHART_WIDTH} y2={CHART_HEIGHT / 2 + TOP_PADDING}
+                    stroke="#f1f5f9" strokeWidth={1} strokeDasharray="3 3" />
+
+                  {/* X-axis baseline */}
+                  <line x1={LEFT_PAD} y1={CHART_HEIGHT + TOP_PADDING} x2={LEFT_PAD + CHART_WIDTH} y2={CHART_HEIGHT + TOP_PADDING}
+                    stroke="#cbd5e1" strokeWidth={1.5} />
+
+                  {/* Y-axis vertical line */}
+                  <line x1={LEFT_PAD} y1={TOP_PADDING} x2={LEFT_PAD} y2={CHART_HEIGHT + TOP_PADDING}
+                    stroke="#cbd5e1" strokeWidth={1.5} />
+
+                  {/* Y-axis labels — fixed RTL collision by forcing LTR and end alignment */}
+                  <text x={LEFT_PAD - 6} y={TOP_PADDING + 4} textAnchor="end" style={{ direction: 'ltr' }} fontSize={8} fill="#94a3b8" fontWeight={500}>100</text>
+                  <text x={LEFT_PAD - 6} y={CHART_HEIGHT / 2 + TOP_PADDING + 4} textAnchor="end" style={{ direction: 'ltr' }} fontSize={8} fill="#94a3b8" fontWeight={500}>50</text>
+                  <text x={LEFT_PAD - 6} y={CHART_HEIGHT + TOP_PADDING - 4} textAnchor="end" style={{ direction: 'ltr' }} fontSize={8} fill="#94a3b8" fontWeight={500}>0</text>
+
                   
-                  <path d={`${pathStr} V${CHART_HEIGHT + TOP_PADDING} H0 Z`} fill="url(#chartFill)"></path>
-                  <path d={pathStr} fill="none" stroke="#2fab99" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" className="transition-all duration-1000 origin-left scale-x-100 group-hover:stroke-teal-600"></path>
+                  <path d={areaStr} fill="url(#chartFill)" />
+                  <path d={pathStr} fill="none" stroke="#2fab99" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" className="transition-all duration-1000 group-hover:stroke-teal-600" />
                   
                   {chartPoints.map((p, i) => (
                     <g key={i}>
@@ -203,7 +326,7 @@ export default function StaffProfileScreen() {
                         textAnchor="middle" 
                         className="fill-secondary text-[10px] font-medium"
                       >
-                        {p.week}
+                        {p.label}
                       </text>
                     </g>
                   ))}
@@ -215,12 +338,12 @@ export default function StaffProfileScreen() {
                     className="absolute z-20 bg-surface-container-high text-on-surface shadow-lg rounded-xl px-3 py-2 text-xs border border-outline-variant/30 animate-in fade-in zoom-in-95 duration-200 pointer-events-none flex flex-col items-center gap-0.5"
                     style={{ 
                       left: `${(chartPoints[activePoint].x / 400) * 100}%`,
-                      top: `${(chartPoints[activePoint].y / 150) * 100}%`,
+                      top: `${(chartPoints[activePoint].y / (CHART_HEIGHT + TOP_PADDING * 2)) * 100}%`,
                       transform: 'translate(-50%, -120%)'
                     }}
                   >
                     <div className="font-black text-vertex-teal text-sm">{chartPoints[activePoint].score}%</div>
-                    <div className="text-[9px] font-bold text-secondary uppercase tracking-wider">{chartPoints[activePoint].week}</div>
+                    <div className="text-[9px] font-bold text-secondary uppercase tracking-wider">{chartPoints[activePoint].label}</div>
                     {/* Tooltip arrow */}
                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-surface-container-high border-r border-b border-outline-variant/30 rotate-45" />
                   </div>
@@ -257,46 +380,61 @@ export default function StaffProfileScreen() {
             )}
           </div>
           
-          <div className="space-y-3">
-            {historyData.length === 0 ? (
+          <div className="space-y-6">
+            {sortedMonths.length === 0 ? (
               <p className="text-sm text-secondary text-center py-4">لم يتم تقييم هذا الموظف بعد.</p>
             ) : (
-              historyData.slice(0, 5).map((evalItem) => (
-                <div 
-                  key={evalItem.id} 
-                  onClick={() => navigate(`/evaluations/${evalItem.id}`)}
-                  className="bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-primary/10 shadow-sm"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                      <Icon name="FileText" size={20} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-on-surface">أسبوع {evalItem.academic_week_number}</p>
-                      <p className="text-[10px] text-secondary">{new Date(evalItem.week_start_date).toLocaleDateString('ar-SA')}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-on-surface">{evalItem.overall_score_percentage}/100</p>
-                      <p className="text-[10px] text-outline">مكتمل</p>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log("Downloading PDF for", evalItem.id);
-                      }}
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container text-secondary hover:bg-primary hover:text-white transition-all active:scale-90 shadow-sm border border-transparent hover:border-primary"
-                    >
-                      <Icon name="Download" size={16} />
-                    </button>
+              sortedMonths.map((month) => (
+                <div key={month} className="space-y-3">
+                  <h4 className="text-sm font-bold text-vertex-teal bg-surface-container-low px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                    الشهر {month}
+                  </h4>
+                  <div className="space-y-3">
+                    {groupedHistory[month].map((evalItem) => (
+                      <div 
+                        key={evalItem.id} 
+                        onClick={() => navigate(`/evaluations/${evalItem.id}`)}
+                        className="bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-primary/10 shadow-sm"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                            <Icon name="FileText" size={20} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-on-surface">أسبوع {evalItem.month_week_number}</p>
+                            <p className="text-[10px] text-secondary">{new Date(evalItem.week_start_date).toLocaleDateString('ar-SA')}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                          <div className="text-left">
+                            <p className="text-sm font-bold text-on-surface">{evalItem.overall_score_percentage}/100</p>
+                            <p className="text-[10px] text-outline">مكتمل</p>
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("Downloading PDF for", evalItem.id);
+                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container text-secondary hover:bg-primary hover:text-white transition-all active:scale-90 shadow-sm border border-transparent hover:border-primary"
+                          >
+                            <Icon name="Download" size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))
             )}
           </div>
         </section>
+          </>
+        )}
+
+        {activeTab === 'portfolio' && (
+          <StaffAchievementsView staffId={staff.id} />
+        )}
       </main>
     </div>
   );
