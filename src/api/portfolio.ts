@@ -40,6 +40,29 @@ export function usePortfolioQuery(staffId: string | undefined, fiscalYearLabel: 
   });
 }
 
+export function useStaffAchievementsQuery(staffId: string | undefined) {
+  return useQuery({
+    queryKey: ['staff_achievements', staffId],
+    queryFn: async () => {
+      if (!staffId) return [];
+
+      const { data, error } = await supabase
+        .from('staff_achievements')
+        .select('*')
+        .eq('staff_id', staffId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching staff achievements:', error);
+        throw error;
+      }
+
+      return data as StaffAchievement[];
+    },
+    enabled: !!staffId,
+  });
+}
+
 export function useSavePortfolioMutation() {
   const queryClient = useQueryClient();
 

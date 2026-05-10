@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { StaffAchievementsView } from './StaffAchievementsView';
 
 function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
   if (data.length <= maxPoints) return data;
@@ -47,6 +48,15 @@ export default function StaffProfileScreen() {
   const { data: historyData = [] } = useStaffEvaluationsHistoryQuery(effectiveStaffId, fiscalContext?.activeFiscalYear?.year_label);
   const { data: trendData } = useStaffPerformanceTrendQuery(effectiveStaffId);
   const [activePoint, setActivePoint] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'evaluations' | 'portfolio'>(() => {
+    const saved = localStorage.getItem('staff_profile_active_tab');
+    return saved === 'portfolio' ? 'portfolio' : 'evaluations';
+  });
+
+  const handleTabChange = (tab: 'evaluations' | 'portfolio') => {
+    setActiveTab(tab);
+    localStorage.setItem('staff_profile_active_tab', tab);
+  };
 
   if (!staff) {
     return (
@@ -199,6 +209,36 @@ export default function StaffProfileScreen() {
           </section>
         )}
 
+        {/* ── Segmented Tab Control ── */}
+        <div className="flex bg-surface-container rounded-2xl p-1 shadow-sm border border-outline-variant/10" role="tablist" aria-label="تبديل القسم">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'evaluations'}
+            onClick={() => handleTabChange('evaluations')}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+              activeTab === 'evaluations'
+                ? 'bg-surface-container-lowest text-vertex-teal shadow-sm'
+                : 'text-secondary hover:text-on-surface'
+            }`}
+          >
+            التقييمات الأسبوعية
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'portfolio'}
+            onClick={() => handleTabChange('portfolio')}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+              activeTab === 'portfolio'
+                ? 'bg-surface-container-lowest text-vertex-teal shadow-sm'
+                : 'text-secondary hover:text-on-surface'
+            }`}
+          >
+            ملف الإنجاز
+          </button>
+        </div>
+
+        {activeTab === 'evaluations' && (
+          <>
         {/* Performance Chart Section */}
         <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_20px_rgba(11,28,48,0.04)]">
           <div className="flex justify-between items-center mb-6">
@@ -374,6 +414,12 @@ export default function StaffProfileScreen() {
             )}
           </div>
         </section>
+          </>
+        )}
+
+        {activeTab === 'portfolio' && (
+          <StaffAchievementsView staffId={staff.id} />
+        )}
       </main>
     </div>
   );
