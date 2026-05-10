@@ -68,7 +68,7 @@ export async function uploadEvaluationEvidence(
 }
 
 /**
- * Uploads a document to the evaluation_evidence bucket for the staff portfolio.
+ * Uploads a document to the portfolio_documents bucket for the staff portfolio.
  * 
  * @param file The file to upload.
  * @param schoolId The ID of the school.
