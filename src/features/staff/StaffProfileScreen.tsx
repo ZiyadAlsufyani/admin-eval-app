@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useStaffEvaluationsHistoryQuery, useStaffPerformanceTrendQuery } from '@/api/evaluations';
 import type { StaffOutletContext } from '@/components/layout/MobileLayout';
+import { useQueryClient } from '@tanstack/react-query';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { Icon } from '@/components/ui/icon';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
@@ -27,6 +29,7 @@ export default function StaffProfileScreen() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { staffList, fiscalContext } = useOutletContext<StaffOutletContext>();
+  const queryClient = useQueryClient();
 
   const isPrincipal = profile?.role === 'principal';
   const effectiveStaffId = isPrincipal ? staffId : profile?.id;
@@ -144,7 +147,8 @@ export default function StaffProfileScreen() {
         }
       />
 
-      <main className="pt-6 px-4 max-w-lg mx-auto space-y-6">
+      <PullToRefresh onRefresh={async () => { await queryClient.invalidateQueries(); }}>
+        <main className="pt-6 px-4 max-w-lg mx-auto space-y-6">
         {/* Profile Header Section */}
         <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_20px_rgba(11,28,48,0.04)] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16"></div>
@@ -435,7 +439,8 @@ export default function StaffProfileScreen() {
         {activeTab === 'portfolio' && (
           <StaffAchievementsView staffId={staff.id} />
         )}
-      </main>
+        </main>
+      </PullToRefresh>
     </div>
   );
 }

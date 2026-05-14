@@ -26,12 +26,12 @@ export function MobileLayout() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const [selectedEvaluationWeek, setSelectedEvaluationWeekState] = useState<Date>(() => {
-    const saved = localStorage.getItem('selectedEvaluationWeek');
+    const saved = sessionStorage.getItem('selectedEvaluationWeek');
     return saved ? new Date(saved) : getStartOfWeek();
   });
   
   const setSelectedEvaluationWeek = (date: Date) => {
-    localStorage.setItem('selectedEvaluationWeek', date.toISOString());
+    sessionStorage.setItem('selectedEvaluationWeek', date.toISOString());
     setSelectedEvaluationWeekState(date);
   };
   

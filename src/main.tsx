@@ -124,17 +124,16 @@ if (globalInput) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Data is considered fresh for 5 minutes. No background refetching will 
-      // occur if the user refocuses the window within this window.
-      staleTime: 1000 * 60 * 5, 
+      // Data is considered fresh for 1 minute.
+      staleTime: 1000 * 60, 
       
       // Data will remain in cache for 30 minutes before being garbage collected
       gcTime: 1000 * 60 * 30, 
       
-      // Do not refetch aggressively on mount if the data is already in cache
-      refetchOnMount: false, 
+      // Refetch on mount to ensure freshness, combined with Stale-While-Revalidate
+      refetchOnMount: true, 
       
-      // Only refetch on window focus if the data is actually stale
+      // Refetch on window focus
       refetchOnWindowFocus: true, 
       
       // Retry failed requests fewer times to prevent long hanging spinners

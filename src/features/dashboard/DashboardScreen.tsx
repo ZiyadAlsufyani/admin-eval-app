@@ -6,6 +6,7 @@ import type { StaffOutletContext } from '@/components/layout/MobileLayout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCumulativePerformanceQuery } from '@/api/evaluations';
 import { AppHeader } from '@/components/layout/AppHeader';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 
 export default function DashboardScreen() {
   const { staffList, fiscalContext } = useOutletContext<StaffOutletContext>();
@@ -54,7 +55,8 @@ export default function DashboardScreen() {
         }
       />
 
-      <main className="px-5 pt-2 space-y-6">
+      <PullToRefresh onRefresh={async () => { await queryClient.invalidateQueries(); }}>
+        <main className="px-5 pt-2 space-y-6">
         
         {/* Urgent Actions Hero Section */}
         {profile?.role === 'principal' && (
@@ -165,7 +167,8 @@ export default function DashboardScreen() {
           </div>
         </section>
 
-      </main>
+        </main>
+      </PullToRefresh>
     </div>
   );
 }
