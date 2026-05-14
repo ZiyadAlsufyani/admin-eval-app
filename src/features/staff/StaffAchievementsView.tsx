@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { useStaffAchievementsQuery, type StaffAchievement } from '@/api/portfolio';
+import { useStaffAchievementsQuery, useDeleteAchievementMutation, type StaffAchievement } from '@/api/portfolio';
 import { Icon } from '@/components/ui/icon';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -234,10 +235,20 @@ interface AchievementItemProps {
 function AchievementItem({ item }: AchievementItemProps) {
   const isCourse = item.type === 'course';
   const publicUrl = getPublicUrl(item.document_url);
+  const { profile } = useAuth();
+  const { mutate: deleteAchievement, isPending } = useDeleteAchievementMutation();
 
   const handleDownload = () => {
     if (publicUrl) {
       window.open(publicUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('هل أنت متأكد من حذف هذا الإنجاز؟ لا يمكن التراجع عن هذه الخطوة.')) {
+      if (item.id) {
+        deleteAchievement({ achievementId: item.id, documentUrl: item.document_url });
+      }
     }
   };
 
@@ -279,20 +290,45 @@ function AchievementItem({ item }: AchievementItemProps) {
         </div>
       </div>
 
-      {/* Download button — mr-auto pushes it to the left in RTL */}
-      <button
-        onClick={handleDownload}
-        disabled={!publicUrl}
-        title={publicUrl ? 'عرض المستند' : 'لا يوجد مستند'}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 active:scale-90 mr-auto ${
-          publicUrl
-            ? 'bg-surface-container text-vertex-teal hover:bg-vertex-teal hover:text-white shadow-sm border border-outline-variant/20 hover:border-vertex-teal'
-            : 'bg-surface-container text-outline/40 cursor-not-allowed'
-        }`}
-        aria-label="تحميل المستند"
-      >
-        <Icon name="Download" size={16} />
-      </button>
+      {/* Action buttons — mr-auto pushes them to the left in RTL */}
+      <div className="mr-auto flex items-center gap-2">
+        <button
+          onClick={handleDownload}
+          disabled={!publicUrl}
+          title={publicUrl ? 'عرض المستند' : 'لا يوجد مستند'}
+          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 active:scale-90 ${
+            publicUrl
+              ? 'bg-surface-container text-vertex-teal hover:bg-vertex-teal hover:text-white shadow-sm border border-outline-variant/20 hover:border-vertex-teal'
+              : 'bg-surface-container text-outline/40 cursor-not-allowed'
+          }`}
+          aria-label="تحميل المستند"
+        >
+          <Icon name="Download" size={16} />
+        </button>
+
+        {profile?.role === 'staff' && (
+          <button
+            onClick={handleDelete}
+            disabled={isPending}
+            title="حذف الإنجاز"
+            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 active:scale-90 shadow-sm border border-outline-variant/20 ${
+              isPending
+                ? 'opacity-50 cursor-wait bg-surface-container text-red-500'
+                : 'bg-surface-container text-red-500 hover:bg-red-50 hover:border-red-200 active:bg-red-100'
+            }`}
+            aria-label="حذف الإنجاز"
+          >
+            {isPending ? (
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <Icon name="Trash2" size={16} />
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

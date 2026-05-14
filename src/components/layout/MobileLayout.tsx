@@ -91,7 +91,6 @@ export function MobileLayout() {
   ] : [
     { id: 'home', label: 'الرئيسية', icon: 'Home' as const, href: '/staff-dashboard' },
     { id: 'portfolio', label: 'الإنجاز', icon: 'Briefcase' as const, href: '/staff-portfolio' },
-    { id: 'profile', label: 'ملفي', icon: 'User' as const, href: '/staff-profile' },
   ];
 
   return (

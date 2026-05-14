@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { StaffAchievementsView } from './StaffAchievementsView';
 
 function sampleChartData<T>(data: T[], maxPoints = 6): T[] {
@@ -138,12 +139,25 @@ export default function StaffProfileScreen() {
       <AppHeader
         title="ملف الموظف"
         actions={
-          <button 
-            onClick={() => navigate(isPrincipal ? '/staff' : '/staff-dashboard')}
-            className="text-secondary hover:bg-surface-container transition-colors p-2 rounded-xl active:scale-95 duration-200"
-          >
-            <Icon name="ArrowRight" size={24} />
-          </button>
+          isPrincipal ? (
+            <button 
+              onClick={() => navigate('/staff')}
+              className="text-secondary hover:bg-surface-container transition-colors p-2 rounded-xl active:scale-95 duration-200"
+            >
+              <Icon name="ArrowRight" size={24} />
+            </button>
+          ) : (
+            <button 
+              onClick={async () => {
+                await supabase.auth.signOut();
+                queryClient.clear();
+              }}
+              aria-label="تسجيل الخروج" 
+              className="text-error p-2 hover:bg-error/10 rounded-full transition-transform active:scale-95 duration-200"
+            >
+              <Icon name="LogOut" size={24} />
+            </button>
+          )
         }
       />
 

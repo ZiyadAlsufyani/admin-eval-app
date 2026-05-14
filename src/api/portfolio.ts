@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { deletePortfolioDocument } from '@/api/storage';
 
 export type StaffAchievement = {
   id?: string;
@@ -89,6 +90,31 @@ export function useSavePortfolioMutation() {
           queryKey: ['portfolio', variables[0].staff_id, variables[0].fiscal_year_label, variables[0].fiscal_month],
         });
       }
+    },
+  });
+}
+
+export function useDeleteAchievementMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ achievementId, documentUrl }: { achievementId: string; documentUrl?: string | null }) => {
+      if (documentUrl) {
+        await deletePortfolioDocument(documentUrl);
+      }
+
+      const { error } = await supabase
+        .from('staff_achievements')
+        .delete()
+        .eq('id', achievementId);
+
+      if (error) {
+        console.error('Error deleting achievement:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff_achievements'] });
     },
   });
 }

@@ -7,12 +7,17 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useCumulativePerformanceQuery } from '@/api/evaluations';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
+import StaffProfileScreen from '../staff/StaffProfileScreen';
 
 export default function DashboardScreen() {
   const { staffList, fiscalContext } = useOutletContext<StaffOutletContext>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+
+  if (profile?.role === 'staff') {
+    return <StaffProfileScreen />;
+  }
 
   // Fetch cumulative staff averages from the database
   const { data: cumulativeData = {} } = useCumulativePerformanceQuery(

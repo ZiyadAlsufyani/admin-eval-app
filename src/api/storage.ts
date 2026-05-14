@@ -193,3 +193,20 @@ export const compressImageIfNeeded = (file: File, maxBytes: number): Promise<Fil
     img.src = objectUrl;
   });
 };
+
+/**
+ * Deletes a portfolio document from the bucket.
+ * 
+ * @param path The storage path of the file to delete.
+ */
+export async function deletePortfolioDocument(path: string): Promise<void> {
+  const { error } = await supabase.storage
+    .from('portfolio_documents')
+    .remove([path]);
+
+  if (error) {
+    console.error('Error deleting portfolio document:', error);
+    throw error;
+  }
+}
+
